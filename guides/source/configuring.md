@@ -12,20 +12,300 @@ After reading this guide, you will know:
 
 --------------------------------------------------------------------------------
 
-Locations for Initialization Code
----------------------------------
+The `Configuration` Object
+--------------------------
 
-Rails offers four standard spots to place initialization code:
+Rails' configuration settings are all held in an instance of
+[`Rails::Application::Configuration`](https://api.rubyonrails.org/classes/Rails/Application/Configuration.html).
+It's instantiated when Rails boots, and can be accessed anywhere in the application
+with `Rails.app.config`.
 
-* `config/application.rb`
-* Environment-specific configuration files
-* Initializers
-* After-initializers
+### Applying Configuration Settings
 
-Running Code Before Rails
--------------------------
+Rails offers three standard locations to add or modify values on the configuration object:
 
-In the rare event that your application needs to run some code before Rails itself is loaded, put it above the call to `require "rails/all"` in `config/application.rb`.
+1. `config/application.rb`
+2. Environment-specific configuration files
+3. Initializers
+
+#### `config/application.rb`
+
+The `config/application.rb` can be thought of as the entry point to your Rails app. The
+configuration object is available via `config` in the application class:
+
+```ruby#14,15
+require_relative "boot"
+
+require "rails/all"
+
+# Require the gems listed in Gemfile, including any gems
+# you've limited to :test, :development, or :production.
+Bundler.require(*Rails.groups)
+
+module MyRailsApp
+  class Application < Rails::Application
+    # Initialize configuration defaults for originally generated Rails version.
+    config.load_defaults 8.1
+
+    config.autoload_lib(ignore: %w[assets tasks])
+    config.time_zone = "Central Time (US & Canada)"
+  end
+end
+```
+
+#### Environment-specific configuration files
+
+Each Rails environment has a file for environment-specific settings:
+
+* `config/environments/production.rb`
+* `config/environments/development.rb`
+* `config/environments/test.rb`
+
+These files are structured in the same way:
+
+```ruby
+Rails.application.configure do
+  # Settings specified here will take precedence over those in config/application.rb.
+
+  config.eager_load = true
+  # ...
+end
+```
+
+The configuration object can be accessed using `config` in the `configure` block. You may
+also add additional arbitrary code outside the `configure` block which will be run
+when Rails boots in a specific environment.
+
+This file is useful for defining settings that are environment dependent — such as
+the logger, SMTP servers, the cache store, and error handling.
+
+#### Initializers
+
+All Ruby files under `config/initializers` are loaded by Rails when it boots. Create
+files in this folder to apply custom settings. The configuration objects isn't
+automatically available in these files, use `Rails.app.configure` block, or
+access the object directly using `Rails.app.config`.
+
+```ruby
+# config/initializers/cookies.rb
+
+# Directly accessing the configuration object
+Rails.app.config.action_dispatch.signed_cookie_digest = "SHA256"
+
+# Using a block to access the configuration object
+Rails.app.configure do
+  config.action_dispatch.signed_cookie_salt = "a new salt"
+
+  # ...
+end
+```
+
+Initializer files are a great place for custom app-specific intialization and configuration
+code, as you can logically group settings in multiple files. Some examples of components you
+may use an initializer file to configure are: cookies, sessions, inflections,
+and Rack middleware.
+
+Initializer files are sorted and then loaded one-by-one. However, don't rely on the
+load order — if an initializer has code that relies on code in another initializer,
+combine them into a single file. This makes the dependencies explicit and hence easier
+to reason about. Explicitly loading initializers with `require` is not recommended, as
+it will cause the initializer to get loaded twice.
+
+In the rare event that your application needs to run some code before
+Rails itself is loaded, put it above `require "rails/all"`
+in `config/application.rb`.
+
+You can learn more about the exact load order of the files described above, and details about
+the Rails boot process in the [initialization guide](initialization.html).
+
+### Initialization Events
+
+Sometimes you might need to run code at specific times during the initialization process. For example,
+you made need to apply a configuration setting after a gem has initialized, but there is no
+guarantee that your application's initializers will be run after all your gem's initializers.
+
+To solve this problem, Rails provides a number of initialization events that can be
+hooked into (listed in the order that they are run):
+
+* `before_configuration`: Run when your application class in `config/application.rb` is
+loaded, before the class body is executed. Engines may use this hook to run code
+before the application itself gets configured.
+
+* `before_initialize`: Run directly before the Railties and Engines are initialized.
+
+* `to_prepare`: Run after the initializers are run for all Railties (including the application
+itself) and Engines, and after the middleware stack is built, but before eager loading. More
+importantly, it will run upon every code reload in `development`, but only
+once (during boot-up) in `production` and `test`.
+
+* `before_eager_load`: Run directly before eager loading occurs. Eager loading is enabled
+in `production` by default, but disabled in other environments.
+
+* `after_initialize`: Run after the application has been initialized, and after the
+files in `config/initializers/` are executed.
+
+You can access these hooks via the Rails configuration object:
+
+```ruby
+module MyRailsApp
+  class Application < Rails::Application
+    config.before_configuration do
+      # ...
+    end
+
+    config.before_initialize do
+      # ...
+    end
+
+    config.to_prepare do
+      # ...
+    end
+
+    config.before_eager_load do
+      # ...
+    end
+
+    config.after_initialize do
+      # ...
+    end
+  end
+end
+```
+
+or
+
+```ruby
+Rails.app.config.before_configuration do
+  # ...
+end
+
+Rails.app.config.before_initialize do
+  # ...
+end
+
+Rails.app.config.to_prepare do
+  # ...
+end
+
+Rails.app.config.before_eager_load do
+  # ...
+end
+
+Rails.app.config.after_initialize do
+  # ...
+end
+```
+
+You can define multiple blocks for each hook, and they'll be invoked sequentially. For example, you
+may define a `to_prepare` block in `config/application.rb`, and another in an initializer file, and
+they'll both be run one after the other.
+
+WARNING: Some parts of your application, notably routing, are not yet set up at the point
+where the `after_initialize` block is called.
+
+### Load Hooks
+
+Rails is modular, and composed of several frameworks such as Active Record, Action Dispatch etc. Load
+hooks allow you to hook into the loading of these frameworks to run your own initialization code. This way,
+your application won't cause conflicts by arbitrarily triggering a framework to load
+during initialization, or try to invoke code from a framework that hasn't been loaded yet.
+
+Use `ActiveSupport.on_load` to define a load hook:
+
+```ruby
+# Called after Active Record has been loaded. The block is evaluated
+# in the context of the target (in this case `ActiveRecord::Base`),
+# hence we can include a module directly.
+ActiveSupport.on_load(:active_record) do
+  include MyActiveRecordHelper
+end
+```
+
+Here's another example of using a load hook to apply a configuration setting in
+Active Record:
+
+```ruby
+ActiveSupport.on_load(:active_record) do
+  self.include_root_in_json = true
+end
+```
+
+Search the Rails source code for `ActiveSupport.run_load_hooks` to find all the components
+that support lazy load hooks, the name of their hooks, when they're invoked, and the object within
+which the blocks are evaluated. All available hooks are also [listed below](#list-of-load-hooks)
+
+For example, if you search for `ActiveSupport.run_load_hooks(:active_record`, you'll find it in
+`activerecord/lib/activerecord/base.rb` as:
+
+```ruby
+ActiveSupport.run_load_hooks(:active_record, Base)
+```
+
+You can see that `Base` is passed as an argument when the hooks are run, meaning that's the hooks
+will be evaluated within the context of that object.
+
+#### List of Load Hooks
+
+Here's a list of all load hooks triggered by Rails and its components.
+
+| Class                                | Hook                                 |
+| -------------------------------------| ------------------------------------ |
+| `ActionCable`                        | `action_cable`                       |
+| `ActionCable::Channel::Base`         | `action_cable_channel`               |
+| `ActionCable::Connection::Base`      | `action_cable_connection`            |
+| `ActionCable::Connection::TestCase`  | `action_cable_connection_test_case`  |
+| `ActionController::API`              | `action_controller_api`              |
+| `ActionController::API`              | `action_controller`                  |
+| `ActionController::Base`             | `action_controller_base`             |
+| `ActionController::Base`             | `action_controller`                  |
+| `ActionController::Live`             | `action_controller_live`             |
+| `ActionController::TestCase`         | `action_controller_test_case`        |
+| `ActionDispatch::IntegrationTest`    | `action_dispatch_integration_test`   |
+| `ActionDispatch::Response`           | `action_dispatch_response`           |
+| `ActionDispatch::Request`            | `action_dispatch_request`            |
+| `ActionDispatch::SystemTestCase`     | `action_dispatch_system_test_case`   |
+| `ActionMailbox::Base`                | `action_mailbox`                     |
+| `ActionMailbox::InboundEmail`        | `action_mailbox_inbound_email`       |
+| `ActionMailbox::Record`              | `action_mailbox_record`              |
+| `ActionMailbox::TestCase`            | `action_mailbox_test_case`           |
+| `ActionMailer::Base`                 | `action_mailer`                      |
+| `ActionMailer::TestCase`             | `action_mailer_test_case`            |
+| `ActionText::Content`                | `action_text_content`                |
+| `ActionText::Record`                 | `action_text_record`                 |
+| `ActionText::RichText`               | `action_text_rich_text`              |
+| `ActionText::EncryptedRichText`      | `action_text_encrypted_rich_text`    |
+| `ActionView::Base`                   | `action_view`                        |
+| `ActionView::TestCase`               | `action_view_test_case`              |
+| `ActiveJob::Base`                    | `active_job`                         |
+| `ActiveJob::TestCase`                | `active_job_test_case`               |
+| `ActiveModel::Model`                 | `active_model`                       |
+| `ActiveModel::Translation`           | `active_model_translation`           |
+| `ActiveRecord::Base`                 | `active_record`                      |
+| `ActiveRecord::DatabaseConfigurations` | `active_record_database_configurations` |
+| `ActiveRecord::Encryption`           | `active_record_encryption`           |
+| `ActiveRecord::TestFixtures`         | `active_record_fixtures`             |
+| `ActiveRecord::ConnectionAdapters::PostgreSQLAdapter`    | `active_record_postgresqladapter`    |
+| `ActiveRecord::ConnectionAdapters::Mysql2Adapter`        | `active_record_mysql2adapter`        |
+| `ActiveRecord::ConnectionAdapters::TrilogyAdapter`       | `active_record_trilogyadapter`       |
+| `ActiveRecord::ConnectionAdapters::SQLite3Adapter`       | `active_record_sqlite3adapter`       |
+| `ActiveStorage::Attachment`          | `active_storage_attachment`          |
+| `ActiveStorage::VariantRecord`       | `active_storage_variant_record`      |
+| `ActiveStorage::Blob`                | `active_storage_blob`                |
+| `ActiveStorage::Record`              | `active_storage_record`              |
+| `ActiveSupport::TestCase`            | `active_support_test_case`           |
+| `i18n`                               | `i18n`                               |
+
+
+Rails Environment Settings
+--------------------------
+
+Some parts of Rails can also be configured externally by supplying environment variables. The following environment variables are recognized by various parts of Rails:
+
+* `ENV["RAILS_ENV"]` defines the Rails environment (production, development, test, and so on) that Rails will run under.
+
+* `ENV["RAILS_RELATIVE_URL_ROOT"]` is used by the routing code to recognize URLs when you [deploy your application to a subdirectory](configuring.html#deploy-to-a-subdirectory-relative-url-root).
+
+* `ENV["RAILS_CACHE_ID"]` and `ENV["RAILS_APP_VERSION"]` are used to generate expanded cache keys in Rails' caching code. This allows you to have multiple separate caches from the same application.
 
 Configuring Rails Components
 ----------------------------
@@ -4338,211 +4618,6 @@ server {
 Be sure to read the [NGINX documentation](https://nginx.org/en/docs/) for the most up-to-date information.
 
 
-Rails Environment Settings
---------------------------
-
-Some parts of Rails can also be configured externally by supplying environment variables. The following environment variables are recognized by various parts of Rails:
-
-* `ENV["RAILS_ENV"]` defines the Rails environment (production, development, test, and so on) that Rails will run under.
-
-* `ENV["RAILS_RELATIVE_URL_ROOT"]` is used by the routing code to recognize URLs when you [deploy your application to a subdirectory](configuring.html#deploy-to-a-subdirectory-relative-url-root).
-
-* `ENV["RAILS_CACHE_ID"]` and `ENV["RAILS_APP_VERSION"]` are used to generate expanded cache keys in Rails' caching code. This allows you to have multiple separate caches from the same application.
-
-
-Using Initializer Files
------------------------
-
-After loading the framework and any gems in your application, Rails turns to
-loading initializers. An initializer is any Ruby file stored under
-`config/initializers` in your application. You can use initializers to hold
-configuration settings that should be made after all of the frameworks and gems
-are loaded, such as options to configure settings for these parts.
-
-The files in `config/initializers` (and any subdirectories of
-`config/initializers`) are sorted and loaded one by one as part of
-the `load_config_initializers` initializer.
-
-If an initializer has code that relies on code in another initializer, you can
-combine them into a single initializer instead. This makes the dependencies more
-explicit, and can help surface new concepts within your application. Rails also
-supports numbering of initializer file names, but this can lead to file name
-churn. Explicitly loading initializers with `require` is not recommended, since
-it will cause the initializer to get loaded twice.
-
-NOTE: There is no guarantee that your initializers will run after all the gem
-initializers, so any initialization code that depends on a given gem having been
-initialized should go into a `config.after_initialize` block.
-
-Load Hooks
-----------
-
-Rails code can often be referenced on load of an application. Rails is responsible for the load order of these frameworks, so when you load frameworks, such as `ActiveRecord::Base`, prematurely you are violating an implicit contract your application has with Rails. Moreover, by loading code such as `ActiveRecord::Base` on boot of your application you are loading entire frameworks which may slow down your boot time and could cause conflicts with load order and boot of your application.
-
-Load and configuration hooks are the API that allow you to hook into this initialization process without violating the load contract with Rails. This will also mitigate boot performance degradation and avoid conflicts.
-
-### Avoid Loading Rails Frameworks
-
-Since Ruby is a dynamic language, some code will cause different Rails frameworks to load. Take this snippet for instance:
-
-```ruby
-ActiveRecord::Base.include(MyActiveRecordHelper)
-```
-
-This snippet means that when this file is loaded, it will encounter `ActiveRecord::Base`. This encounter causes Ruby to look for the definition of that constant and will require it. This causes the entire Active Record framework to be loaded on boot.
-
-`ActiveSupport.on_load` is a mechanism that can be used to defer the loading of code until it is actually needed. The snippet above can be changed to:
-
-```ruby
-ActiveSupport.on_load(:active_record) do
-  include MyActiveRecordHelper
-end
-```
-
-This new snippet will only include `MyActiveRecordHelper` when `ActiveRecord::Base` is loaded.
-
-### When are Hooks called?
-
-In the Rails framework these hooks are called when a specific library is loaded. For example, when `ActionController::Base` is loaded, the `:action_controller_base` hook is called. This means that all `ActiveSupport.on_load` calls with `:action_controller_base` hooks will be called in the context of `ActionController::Base` (that means `self` will be an `ActionController::Base`).
-
-### Modifying Code to Use Load Hooks
-
-Modifying code is generally straightforward. If you have a line of code that refers to a Rails framework such as `ActiveRecord::Base` you can wrap that code in a load hook.
-
-**Modifying calls to `include`**
-
-```ruby
-ActiveRecord::Base.include(MyActiveRecordHelper)
-```
-
-becomes
-
-```ruby
-ActiveSupport.on_load(:active_record) do
-  # self refers to ActiveRecord::Base here,
-  # so we can call .include
-  include MyActiveRecordHelper
-end
-```
-
-**Modifying calls to `prepend`**
-
-```ruby
-ActionController::Base.prepend(MyActionControllerHelper)
-```
-
-becomes
-
-```ruby
-ActiveSupport.on_load(:action_controller_base) do
-  # self refers to ActionController::Base here,
-  # so we can call .prepend
-  prepend MyActionControllerHelper
-end
-```
-
-**Modifying calls to class methods**
-
-```ruby
-ActiveRecord::Base.include_root_in_json = true
-```
-
-becomes
-
-```ruby
-ActiveSupport.on_load(:active_record) do
-  # self refers to ActiveRecord::Base here
-  self.include_root_in_json = true
-end
-```
-
-### Available Load Hooks
-
-These are the load hooks you can use in your own code. To hook into the initialization process of one of the following classes use the available hook.
-
-| Class                                | Hook                                 |
-| -------------------------------------| ------------------------------------ |
-| `ActionCable`                        | `action_cable`                       |
-| `ActionCable::Channel::Base`         | `action_cable_channel`               |
-| `ActionCable::Connection::Base`      | `action_cable_connection`            |
-| `ActionCable::Connection::TestCase`  | `action_cable_connection_test_case`  |
-| `ActionController::API`              | `action_controller_api`              |
-| `ActionController::API`              | `action_controller`                  |
-| `ActionController::Base`             | `action_controller_base`             |
-| `ActionController::Base`             | `action_controller`                  |
-| `ActionController::Live`             | `action_controller_live`             |
-| `ActionController::TestCase`         | `action_controller_test_case`        |
-| `ActionDispatch::IntegrationTest`    | `action_dispatch_integration_test`   |
-| `ActionDispatch::Response`           | `action_dispatch_response`           |
-| `ActionDispatch::Request`            | `action_dispatch_request`            |
-| `ActionDispatch::SystemTestCase`     | `action_dispatch_system_test_case`   |
-| `ActionMailbox::Base`                | `action_mailbox`                     |
-| `ActionMailbox::InboundEmail`        | `action_mailbox_inbound_email`       |
-| `ActionMailbox::Record`              | `action_mailbox_record`              |
-| `ActionMailbox::TestCase`            | `action_mailbox_test_case`           |
-| `ActionMailer::Base`                 | `action_mailer`                      |
-| `ActionMailer::TestCase`             | `action_mailer_test_case`            |
-| `ActionText::Content`                | `action_text_content`                |
-| `ActionText::Record`                 | `action_text_record`                 |
-| `ActionText::RichText`               | `action_text_rich_text`              |
-| `ActionText::EncryptedRichText`      | `action_text_encrypted_rich_text`    |
-| `ActionView::Base`                   | `action_view`                        |
-| `ActionView::TestCase`               | `action_view_test_case`              |
-| `ActiveJob::Base`                    | `active_job`                         |
-| `ActiveJob::TestCase`                | `active_job_test_case`               |
-| `ActiveModel::Model`                 | `active_model`                       |
-| `ActiveModel::Translation`           | `active_model_translation`           |
-| `ActiveRecord::Base`                 | `active_record`                      |
-| `ActiveRecord::DatabaseConfigurations` | `active_record_database_configurations` |
-| `ActiveRecord::Encryption`           | `active_record_encryption`           |
-| `ActiveRecord::TestFixtures`         | `active_record_fixtures`             |
-| `ActiveRecord::ConnectionAdapters::PostgreSQLAdapter`    | `active_record_postgresqladapter`    |
-| `ActiveRecord::ConnectionAdapters::Mysql2Adapter`        | `active_record_mysql2adapter`        |
-| `ActiveRecord::ConnectionAdapters::TrilogyAdapter`       | `active_record_trilogyadapter`       |
-| `ActiveRecord::ConnectionAdapters::SQLite3Adapter`       | `active_record_sqlite3adapter`       |
-| `ActiveStorage::Attachment`          | `active_storage_attachment`          |
-| `ActiveStorage::VariantRecord`       | `active_storage_variant_record`      |
-| `ActiveStorage::Blob`                | `active_storage_blob`                |
-| `ActiveStorage::Record`              | `active_storage_record`              |
-| `ActiveSupport::TestCase`            | `active_support_test_case`           |
-| `i18n`                               | `i18n`                               |
-
-Initialization Events
----------------------
-
-Rails has 5 initialization events which can be hooked into (listed in the order that they are run):
-
-* `before_configuration`: This is run when the application class inherits from `Rails::Application` in `config/application.rb`. Before the class body is executed. Engines may use this hook to run code before the application itself gets configured.
-
-* `before_initialize`: This is run directly before the initialization process of the application occurs with the `:bootstrap_hook` initializer near the beginning of the Rails initialization process.
-
-* `to_prepare`: Run after the initializers are run for all Railties (including the application itself) and after the middleware stack is built, but before eager loading. More importantly, will run upon every code reload in `development`, but only once (during boot-up) in `production` and `test`.
-
-* `before_eager_load`: This is run directly before eager loading occurs, which is the default behavior for the `production` environment and not for the `development` environment.
-
-* `after_initialize`: Run directly after the initialization of the application, after the application initializers in `config/initializers` are run.
-
-To define an event for these hooks, use the block syntax within a `Rails::Application`, `Rails::Railtie` or `Rails::Engine` subclass:
-
-```ruby
-module YourApp
-  class Application < Rails::Application
-    config.before_initialize do
-      # initialization code goes here
-    end
-  end
-end
-```
-
-Alternatively, you can also do it through the `config` method on the `Rails.application` object:
-
-```ruby
-Rails.application.config.before_initialize do
-  # initialization code goes here
-end
-```
-
-WARNING: Some parts of your application, notably routing, are not yet set up at the point where the `after_initialize` block is called.
 
 ### `Rails::Railtie#initializer`
 
@@ -4784,23 +4859,3 @@ development:
 # development environment
 Rails.application.config_for(:example)[:foo][:bar] #=> { baz: 1, qux: 2 }
 ```
-
-Search Engines Indexing
------------------------
-
-Sometimes, you may want to prevent some pages of your application to be visible
-on search sites like Google, Bing, Yahoo, or Duck Duck Go. The robots that index
-these sites will first analyze the `http://your-site.com/robots.txt` file to
-know which pages it is allowed to index.
-
-Rails creates this file for you inside the `/public` folder. By default, it allows
-search engines to index all pages of your application. If you want to block
-indexing on all pages of your application, use this:
-
-```
-User-agent: *
-Disallow: /
-```
-
-To block just specific pages, it's necessary to use a more complex syntax. Learn
-it on the [official documentation](https://www.robotstxt.org/robotstxt.html).
