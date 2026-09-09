@@ -17,8 +17,8 @@ The `Configuration` Object
 
 Rails' configuration settings are all held in an instance of
 [`Rails::Application::Configuration`](https://api.rubyonrails.org/classes/Rails/Application/Configuration.html).
-It's instantiated when Rails boots, and can be accessed anywhere in the application
-with `Rails.app.config`.
+It's instantiated when Rails boots, and can be accessed anywhere in
+the application with `Rails.app.config` or `Rails.configuration`.
 
 ### Applying Configuration Settings
 
@@ -26,12 +26,13 @@ Rails offers three standard locations to add or modify values on the configurati
 
 1. `config/application.rb`
 2. Environment-specific configuration files
-3. Initializers
+3. Initializer files
 
 #### `config/application.rb`
 
-The `config/application.rb` can be thought of as the entry point to your Rails app. The
-configuration object is available via `config` in the application class:
+The `config/application.rb` can be thought of as the entry point to your
+Rails app. The configuration object is available via `config` in
+the application class:
 
 ```ruby#14,15
 require_relative "boot"
@@ -72,19 +73,22 @@ Rails.application.configure do
 end
 ```
 
-The configuration object can be accessed using `config` in the `configure` block. You may
-also add additional arbitrary code outside the `configure` block which will be run
-when Rails boots in a specific environment.
+The configuration object can be accessed using `config` inside the
+`configure` block. You may also add additional arbitrary code outside
+the `configure` block which will be run when Rails boots in a
+specific environment.
 
-This file is useful for defining settings that are environment dependent — such as
-the logger, SMTP servers, the cache store, and error handling.
+This file is useful for defining settings that are environment
+dependent — such as the logger, SMTP servers, the cache store, and
+error handling.
 
 #### Initializers
 
-All Ruby files under `config/initializers` are loaded by Rails when it boots. Create
-files in this folder to apply custom settings. The configuration objects isn't
-automatically available in these files, use `Rails.app.configure` block, or
-access the object directly using `Rails.app.config`.
+All Ruby files under `config/initializers` are loaded by Rails when it
+boots. Create files in this folder to apply custom settings. The
+configuration object isn't automatically available in these files —
+use `Rails.app.configure`, or access the object directly
+using `Rails.app.config`.
 
 ```ruby
 # config/initializers/cookies.rb
@@ -100,32 +104,124 @@ Rails.app.configure do
 end
 ```
 
-Initializer files are a great place for custom app-specific intialization and configuration
-code, as you can logically group settings in multiple files. Some examples of components you
-may use an initializer file to configure are: cookies, sessions, inflections,
+Initializer files are a great place for custom app-specific
+intialization and configuration code, as you can logically group
+settings in multiple files. Some examples of components you may use
+an initializer file to configure are: cookies, sessions, inflections,
 and Rack middleware.
 
-Initializer files are sorted and then loaded one-by-one. However, don't rely on the
-load order — if an initializer has code that relies on code in another initializer,
-combine them into a single file. This makes the dependencies explicit and hence easier
-to reason about. Explicitly loading initializers with `require` is not recommended, as
-it will cause the initializer to get loaded twice.
+Initializer files are sorted and then loaded one-by-one, but the load
+order isn't guaranteed. If an initializer has code that relies
+on code in another initializer, combine them into a single file. This
+makes the dependencies explicit and hence easier to reason about.
 
-In the rare event that your application needs to run some code before
-Rails itself is loaded, put it above `require "rails/all"`
-in `config/application.rb`.
+WARNING: Manually loading initializers with `require` is not recommended,
+as it will cause the file to be loaded twice.
 
-You can learn more about the exact load order of the files described above, and details about
-the Rails boot process in the [initialization guide](initialization.html).
+If your application needs to run some code before Rails itself is
+loaded, put it above `require "rails/all"` in `config/application.rb`.
 
-### Initialization Events
+You can learn more about the exact load order of the files described
+above, and details about the Rails boot process in the
+[initialization guide](initialization.html).
 
-Sometimes you might need to run code at specific times during the initialization process. For example,
-you made need to apply a configuration setting after a gem has initialized, but there is no
-guarantee that your application's initializers will be run after all your gem's initializers.
+### Custom Configuration
 
-To solve this problem, Rails provides a number of initialization events that can be
-hooked into (listed in the order that they are run):
+You can add custom configuration settings to the configuration object.
+
+```ruby
+Rails.app.config.my_custom_setting = true
+```
+
+When defining a nested configuration, use the `config.x` namespace:
+
+```ruby
+Rails.app.config.x.payment_processing.schedule = :daily
+Rails.app.config.x.payment_processing.retries  = 3
+```
+
+These options are then available through the configuration object:
+
+```ruby
+Rails.app.config.my_custom_setting             # => true
+
+Rails.app.config.x.payment_processing.schedule # => :daily
+Rails.app.config.x.payment_processing.retries  # => 3
+Rails.app.config.x.payment_processing.not_set  # => nil
+```
+
+You can define environment specific configuration options in a YAML
+file and load them in your Rails app
+using [`Rails.app.config_for`](https://api.rubyonrails.org/classes/Rails/Application.html#method-i-config_for). Rails will detect the
+environment and automatically load the appropriate settings.
+
+```yaml
+# config/payment.yml
+
+production:
+  environment: production
+  merchant_id: production_merchant_id
+  public_key:  production_public_key
+  private_key: production_private_key
+
+development:
+  environment: sandbox
+  merchant_id: development_merchant_id
+  public_key:  development_public_key
+  private_key: development_private_key
+
+shared:
+  adapter: processor_name
+```
+
+The YAML file must be in the `config/` folder, and contain top-level
+keys corresponding to the environments. A `shared` key can contain common
+settings which will be merged with the environment-specific options when
+Rails loads the file.
+
+Load the file in your `application.rb`, or in an initializer:
+
+```ruby
+# config/application.rb
+
+module MyApp
+  class Application < Rails::Application
+    config.payment = config_for(:payment)
+  end
+end
+```
+
+```ruby
+# config/initializers/payments.rb
+
+Rails.app.config.payment = Rails.app.config_for(:payment)
+```
+
+You can access the settings via the
+configuration object:
+
+```ruby
+# In the `development` environment
+Rails.app.config.payment.merchant_id
+# => development_merchant_id
+
+# In the `production` environment
+Rails.app.config.payment.merchant_id
+# => production_merchant_id
+```
+
+Initialization Events and Hooks
+-------------------------------
+
+Sometimes you might need to run code at specific times during the
+initialization process — for example, to apply a
+configuration setting after a gem has initialized.
+
+Since the load order of your application's initializers is not
+guaranteed, nor is the fact that they will be run after all gem's have initialized, Rails provides a number of initialization
+events. You can hook into these events to run code at specific times.
+
+The events are listed below in the order in which they are run:
 
 * `before_configuration`: Run when your application class in `config/application.rb` is
 loaded, before the class body is executed. Engines may use this hook to run code
@@ -196,19 +292,22 @@ Rails.app.config.after_initialize do
 end
 ```
 
-You can define multiple blocks for each hook, and they'll be invoked sequentially. For example, you
-may define a `to_prepare` block in `config/application.rb`, and another in an initializer file, and
+You can define multiple blocks for each hook, and they'll be invoked
+sequentially. For example, you may define a `to_prepare` block
+in `config/application.rb`, and another in an initializer file, and
 they'll both be run one after the other.
 
-WARNING: Some parts of your application, notably routing, are not yet set up at the point
-where the `after_initialize` block is called.
+WARNING: Some parts of your application, notably routing, are not yet set
+up at the point where the `after_initialize` block is called.
 
 ### Load Hooks
 
-Rails is modular, and composed of several frameworks such as Active Record, Action Dispatch etc. Load
-hooks allow you to hook into the loading of these frameworks to run your own initialization code. This way,
-your application won't cause conflicts by arbitrarily triggering a framework to load
-during initialization, or try to invoke code from a framework that hasn't been loaded yet.
+Rails is modular, and composed of several frameworks such as Active
+Record, Action Dispatch etc. Load hooks allow you to hook into the
+loading of these frameworks to run your own initialization code. This
+way, your application won't cause conflicts by arbitrarily
+triggering a framework to load during initialization, or try to invoke
+code from a framework that hasn't been loaded yet.
 
 Use `ActiveSupport.on_load` to define a load hook:
 
@@ -230,19 +329,23 @@ ActiveSupport.on_load(:active_record) do
 end
 ```
 
-Search the Rails source code for `ActiveSupport.run_load_hooks` to find all the components
-that support lazy load hooks, the name of their hooks, when they're invoked, and the object within
-which the blocks are evaluated. All available hooks are also [listed below](#list-of-load-hooks)
+Search the Rails source code for `ActiveSupport.run_load_hooks` to find
+all the components that support lazy load hooks, the name of their
+hooks, when they're invoked, and the object within which the blocks
+are evaluated. All available hooks are also
+[listed below](#list-of-load-hooks)
 
-For example, if you search for `ActiveSupport.run_load_hooks(:active_record`, you'll find it in
+For example, if you search for
+`ActiveSupport.run_load_hooks(:active_record`, you'll find it in
 `activerecord/lib/activerecord/base.rb` as:
 
 ```ruby
 ActiveSupport.run_load_hooks(:active_record, Base)
 ```
 
-You can see that `Base` is passed as an argument when the hooks are run, meaning that's the hooks
-will be evaluated within the context of that object.
+You can see that `Base` is passed as an argument when the hooks are
+run, meaning that's the hooks will be evaluated within the context
+of that object.
 
 #### List of Load Hooks
 
@@ -299,180 +402,68 @@ Here's a list of all load hooks triggered by Rails and its components.
 Rails Environment Settings
 --------------------------
 
-Some parts of Rails can also be configured externally by supplying environment variables. The following environment variables are recognized by various parts of Rails:
+Some parts of Rails can be configured externally by defining environment variables. The
+following environment variables are read by various parts of Rails:
 
-* `ENV["RAILS_ENV"]` defines the Rails environment (production, development, test, and so on) that Rails will run under.
+* `ENV["RAILS_ENV"]` defines the Rails environment (`production`, `development`, or `test`).
 
-* `ENV["RAILS_RELATIVE_URL_ROOT"]` is used by the routing code to recognize URLs when you [deploy your application to a subdirectory](configuring.html#deploy-to-a-subdirectory-relative-url-root).
+* `ENV["RAILS_RELATIVE_URL_ROOT"]` is used by the routing code to recognize URLs
+when you [deploy your application to a subdirectory](#deploy-to-a-subdirectory-relative-url-root).
 
-* `ENV["RAILS_CACHE_ID"]` and `ENV["RAILS_APP_VERSION"]` are used to generate expanded cache keys in Rails' caching code. This allows you to have multiple separate caches from the same application.
+* `ENV["RAILS_CACHE_ID"]` and `ENV["RAILS_APP_VERSION"]` are used to generate expanded
+cache keys in Rails' caching code. This allows you to have multiple separate caches
+for the same application.
 
 Configuring Rails Components
 ----------------------------
 
-In general, the work of configuring Rails means configuring the components of Rails, as well as configuring Rails itself. The configuration file `config/application.rb` and environment-specific configuration files (such as `config/environments/production.rb`) allow you to specify the various settings that you want to pass down to all of the components.
+A variety of aspects withing Rails and its contituent components can be
+configured using the configuration object. This section lists all the
+options available for use, and what they control.
 
-For example, you could add this setting to `config/application.rb` file:
+Some components such as Action Mailer may hold their settings under their
+own namespace — for example `ActionMailer::Base.options`. Never use this
+API directly. These components integrate with Rails configuration object
+to ensure settings are loaded correctly. Always use the Rails
+configuration object instead: `Rails.app.config.action_mailer.options`.
+
+NOTE: If you need to apply configuration directly to a class, use a
+[lazy load hook](https://api.rubyonrails.org/classes/ActiveSupport/LazyLoadHooks.html)
+in an initializer to avoid autoloading the class before
+initialization has completed.
+
+Each version of Rails loads of number of defaults for the settings
+listen below. This can be seen in your `application.rb`:
 
 ```ruby
-config.time_zone = "Central Time (US & Canada)"
+module MyRailsApp
+  class Application < Rails::Application
+    # Load default configuration for Rails 8.1
+    config.load_defaults 8.1
+
+    # ...
+  end
+end
 ```
 
-This is a setting for Rails itself. If you want to pass settings to individual Rails components, you can do so via the same `config` object in `config/application.rb`:
+This design gives enables you to load the default settings for an
+older version of Rails than the one you're running, if you need to.
+This makes Rails upgrades easier as you can incrementally make the app
+changes required for compatibility with the latest defaults without
+being stuck on any particular Rails version.
 
-```ruby
-config.active_record.schema_format = :ruby
-```
+The complete list of default values for all Rails versions can be found
+in the [Default Configuration Values](default_configuration_values.md) guide.
 
-Rails will use that particular setting to configure Active Record.
+### General Configuration Options
 
-WARNING: Use the public configuration methods over calling directly to the associated class. e.g. `Rails.application.config.action_mailer.options` instead of `ActionMailer::Base.options`.
-
-NOTE: If you need to apply configuration directly to a class, use a [lazy load hook](https://api.rubyonrails.org/classes/ActiveSupport/LazyLoadHooks.html) in an initializer to avoid autoloading the class before initialization has completed. This will break because autoloading during initialization cannot be safely repeated when the app reloads.
-
-### Versioned Default Values
-
-[`config.load_defaults`] loads default configuration values for a target version and all versions prior. For example, `config.load_defaults 6.1` will load defaults for all versions up to and including version 6.1.
-
-[`config.load_defaults`]: https://api.rubyonrails.org/classes/Rails/Application/Configuration.html#method-i-load_defaults
-
-Below are the default values associated with each target version. In cases of conflicting values, newer versions take precedence over older versions.
-
-#### Default Values for Target Version 8.2
-
-- [`ActiveSupport.raise_on_invalid_time_zone_parse`](#activesupport-raise-on-invalid-time-zone-parse): `true`
-- [`config.action_controller.default_protect_from_forgery_with`](#config-action-controller-default-protect-from-forgery-with): `:exception`
-- [`config.action_controller.forgery_protection_verification_strategy`](#config-action-controller-forgery-protection-verification-strategy): `:header_only`
-- [`config.action_controller.rescue_from_event_backtrace`](#config-action-controller-rescue-from-event-backtrace): `:array`
-- [`config.action_dispatch.default_headers`](#config-action-dispatch-default-headers): `{ "X-Frame-Options" => "SAMEORIGIN", "X-Content-Type-Options" => "nosniff", "X-Permitted-Cross-Domain-Policies" => "none", "Referrer-Policy" => "strict-origin-when-cross-origin" }`
-- [`config.action_dispatch.strict_accept_header`](#config-action-dispatch-strict-accept-header): `true`
-- [`config.active_job.enqueue_after_transaction_commit`](#config-active-job-enqueue-after-transaction-commit): `true`
-- [`config.active_record.postgresql_adapter_decode_bytea`](#config-active-record-postgresql-adapter-decode-bytea): `true`
-- [`config.active_record.postgresql_adapter_decode_money`](#config-active-record-postgresql-adapter-decode-money): `true`
-- [`config.active_storage.analyze`](#config-active-storage-analyze): `:immediately`
-
-#### Default Values for Target Version 8.1
-
-- [`config.action_controller.action_on_path_relative_redirect`](#config-action-controller-action-on-path-relative-redirect): `:raise`
-- [`config.action_controller.escape_json_responses`](#config-action-controller-escape-json-responses): `false`
-- [`config.action_view.remove_hidden_field_autocomplete`](#config-action-view-remove-hidden-field-autocomplete): `true`
-- [`config.action_view.render_tracker`](#config-action-view-render-tracker): `:ruby`
-- [`config.active_record.raise_on_missing_required_finder_order_columns`](#config-active-record-raise-on-missing-required-finder-order-columns): `true`
-- [`config.active_support.escape_js_separators_in_json`](#config-active-support-escape-js-separators-in-json): `false`
-- [`config.yjit`](#config-yjit): `!Rails.env.local?`
-
-#### Default Values for Target Version 8.0
-
-- [`Regexp.timeout`](#regexp-timeout): `1`
-- [`config.action_dispatch.strict_freshness`](#config-action-dispatch-strict-freshness): `true`
-
-#### Default Values for Target Version 7.2
-
-- [`config.active_record.postgresql_adapter_decode_dates`](#config-active-record-postgresql-adapter-decode-dates): `true`
-- [`config.active_record.validate_migration_timestamps`](#config-active-record-validate-migration-timestamps): `true`
-- [`config.active_storage.web_image_content_types`](#config-active-storage-web-image-content-types): `%w( image/png image/jpeg image/gif image/webp )`
-- [`config.yjit`](#config-yjit): `true`
-
-#### Default Values for Target Version 7.1
-
-- [`config.action_dispatch.debug_exception_log_level`](#config-action-dispatch-debug-exception-log-level): `:error`
-- [`config.action_dispatch.default_headers`](#config-action-dispatch-default-headers): `{ "X-Frame-Options" => "SAMEORIGIN", "X-XSS-Protection" => "0", "X-Content-Type-Options" => "nosniff", "X-Permitted-Cross-Domain-Policies" => "none", "Referrer-Policy" => "strict-origin-when-cross-origin" }`
-- [`config.action_text.sanitizer_vendor`](#config-action-text-sanitizer-vendor): `Rails::HTML::Sanitizer.best_supported_vendor`
-- [`config.action_view.sanitizer_vendor`](#config-action-view-sanitizer-vendor): `Rails::HTML::Sanitizer.best_supported_vendor`
-- [`config.active_record.before_committed_on_all_records`](#config-active-record-before-committed-on-all-records): `true`
-- [`config.active_record.belongs_to_required_validates_foreign_key`](#config-active-record-belongs-to-required-validates-foreign-key): `false`
-- [`config.active_record.default_column_serializer`](#config-active-record-default-column-serializer): `nil`
-- [`config.active_record.encryption.hash_digest_class`](#config-active-record-encryption-hash-digest-class): `OpenSSL::Digest::SHA256`
-- [`config.active_record.encryption.support_sha1_for_non_deterministic_encryption`](#config-active-record-encryption-support-sha1-for-non-deterministic-encryption): `false`
-- [`config.active_record.generate_secure_token_on`](#config-active-record-generate-secure-token-on): `:initialize`
-- [`config.active_record.query_log_tags_format`](#config-active-record-query-log-tags-format): `:sqlcommenter`
-- [`config.active_record.raise_on_assign_to_attr_readonly`](#config-active-record-raise-on-assign-to-attr-readonly): `true`
-- [`config.active_record.run_after_transaction_callbacks_in_order_defined`](#config-active-record-run-after-transaction-callbacks-in-order-defined): `true`
-- [`config.active_record.run_commit_callbacks_on_first_saved_instances_in_transaction`](#config-active-record-run-commit-callbacks-on-first-saved-instances-in-transaction): `false`
-- [`config.active_record.sqlite3_adapter_strict_strings_by_default`](#config-active-record-sqlite3-adapter-strict-strings-by-default): `true`
-- [`config.active_support.cache_format_version`](#config-active-support-cache-format-version): `7.1`
-- [`config.active_support.message_serializer`](#config-active-support-message-serializer): `:json_allow_marshal`
-- [`config.active_support.raise_on_invalid_cache_expiration_time`](#config-active-support-raise-on-invalid-cache-expiration-time): `true`
-- [`config.active_support.use_message_serializer_for_metadata`](#config-active-support-use-message-serializer-for-metadata): `true`
-- [`config.add_autoload_paths_to_load_path`](#config-add-autoload-paths-to-load-path): `false`
-- [`config.dom_testing_default_html_version`](#config-dom-testing-default-html-version): `defined?(Nokogiri::HTML5) ? :html5 : :html4`
-- [`config.log_file_size`](#config-log-file-size): `100 * 1024 * 1024`
-- [`config.precompile_filter_parameters`](#config-precompile-filter-parameters): `true`
-
-#### Default Values for Target Version 7.0
-
-- [`config.action_controller.action_on_open_redirect`](#config-action-controller-action-on-open-redirect): `:raise`
-- [`config.action_controller.wrap_parameters_by_default`](#config-action-controller-wrap-parameters-by-default): `true`
-- [`config.action_dispatch.cookies_serializer`](#config-action-dispatch-cookies-serializer): `:json`
-- [`config.action_dispatch.default_headers`](#config-action-dispatch-default-headers): `{ "X-Frame-Options" => "SAMEORIGIN", "X-XSS-Protection" => "0", "X-Content-Type-Options" => "nosniff", "X-Download-Options" => "noopen", "X-Permitted-Cross-Domain-Policies" => "none", "Referrer-Policy" => "strict-origin-when-cross-origin" }`
-- [`config.action_mailer.smtp_timeout`](#config-action-mailer-smtp-timeout): `5`
-- [`config.action_view.apply_stylesheet_media_default`](#config-action-view-apply-stylesheet-media-default): `false`
-- [`config.action_view.button_to_generates_button_tag`](#config-action-view-button-to-generates-button-tag): `true`
-- [`config.active_record.automatic_scope_inversing`](#config-active-record-automatic-scope-inversing): `true`
-- [`config.active_record.partial_inserts`](#config-active-record-partial-inserts): `false`
-- [`config.active_record.verify_foreign_keys_for_fixtures`](#config-active-record-verify-foreign-keys-for-fixtures): `true`
-- [`config.active_storage.multiple_file_field_include_hidden`](#config-active-storage-multiple-file-field-include-hidden): `true`
-- [`config.active_storage.variant_processor`](#config-active-storage-variant-processor): `:vips`
-- [`config.active_storage.video_preview_arguments`](#config-active-storage-video-preview-arguments): `"-vf 'select=eq(n\\,0)+eq(key\\,1)+gt(scene\\,0.015),loop=loop=-1:size=2,trim=start_frame=1' -frames:v 1 -f image2"`
-- [`config.active_support.cache_format_version`](#config-active-support-cache-format-version): `7.0`
-- [`config.active_support.executor_around_test_case`](#config-active-support-executor-around-test-case): `true`
-- [`config.active_support.hash_digest_class`](#config-active-support-hash-digest-class): `OpenSSL::Digest::SHA256`
-- [`config.active_support.key_generator_hash_digest_class`](#config-active-support-key-generator-hash-digest-class): `OpenSSL::Digest::SHA256`
-
-#### Default Values for Target Version 6.1
-
-- [`ActiveSupport.utc_to_local_returns_utc_offset_times`](#activesupport-utc-to-local-returns-utc-offset-times): `true`
-- [`config.action_dispatch.cookies_same_site_protection`](#config-action-dispatch-cookies-same-site-protection): `:lax`
-- [`config.action_dispatch.ssl_default_redirect_status`](#config-action-dispatch-ssl-default-redirect-status): `308`
-- [`config.action_mailbox.queues.incineration`](#config-action-mailbox-queues-incineration): `nil`
-- [`config.action_mailbox.queues.routing`](#config-action-mailbox-queues-routing): `nil`
-- [`config.action_mailer.deliver_later_queue_name`](#config-action-mailer-deliver-later-queue-name): `nil`
-- [`config.action_view.form_with_generates_remote_forms`](#config-action-view-form-with-generates-remote-forms): `false`
-- [`config.action_view.preload_links_header`](#config-action-view-preload-links-header): `true`
-- [`config.active_job.retry_jitter`](#config-active-job-retry-jitter): `0.15`
-- [`config.active_record.has_many_inversing`](#config-active-record-has-many-inversing): `true`
-- [`config.active_storage.queues.analysis`](#config-active-storage-queues-analysis): `nil`
-- [`config.active_storage.queues.purge`](#config-active-storage-queues-purge): `nil`
-- [`config.active_storage.track_variants`](#config-active-storage-track-variants): `true`
-
-#### Default Values for Target Version 6.0
-
-- [`config.action_dispatch.use_cookies_with_metadata`](#config-action-dispatch-use-cookies-with-metadata): `true`
-- [`config.action_mailer.delivery_job`](#config-action-mailer-delivery-job): `"ActionMailer::MailDeliveryJob"`
-- [`config.action_view.default_enforce_utf8`](#config-action-view-default-enforce-utf8): `false`
-- [`config.active_record.collection_cache_versioning`](#config-active-record-collection-cache-versioning): `true`
-- [`config.active_storage.queues.analysis`](#config-active-storage-queues-analysis): `:active_storage_analysis`
-- [`config.active_storage.queues.purge`](#config-active-storage-queues-purge): `:active_storage_purge`
-
-#### Default Values for Target Version 5.2
-
-- [`config.action_controller.default_protect_from_forgery`](#config-action-controller-default-protect-from-forgery): `true`
-- [`config.action_dispatch.use_authenticated_cookie_encryption`](#config-action-dispatch-use-authenticated-cookie-encryption): `true`
-- [`config.action_view.form_with_generates_ids`](#config-action-view-form-with-generates-ids): `true`
-- [`config.active_record.cache_versioning`](#config-active-record-cache-versioning): `true`
-- [`config.active_support.hash_digest_class`](#config-active-support-hash-digest-class): `OpenSSL::Digest::SHA1`
-- [`config.active_support.use_authenticated_message_encryption`](#config-active-support-use-authenticated-message-encryption): `true`
-
-#### Default Values for Target Version 5.1
-
-- [`config.action_view.form_with_generates_remote_forms`](#config-action-view-form-with-generates-remote-forms): `true`
-- [`config.assets.unknown_asset_fallback`](#config-assets-unknown-asset-fallback): `false`
-
-#### Default Values for Target Version 5.0
-
-- [`config.action_controller.forgery_protection_origin_check`](#config-action-controller-forgery-protection-origin-check): `true`
-- [`config.action_controller.per_form_csrf_tokens`](#config-action-controller-per-form-csrf-tokens): `true`
-- [`config.active_record.belongs_to_required_by_default`](#config-active-record-belongs-to-required-by-default): `true`
-- [`config.ssl_options`](#config-ssl-options): `{ hsts: { subdomains: true } }`
-
-### Rails General Configuration
-
-The following configuration methods are to be called on a `Rails::Railtie` object, such as a subclass of `Rails::Engine` or `Rails::Application`.
+The following methods are used to configure a `Rails::Railtie` object,
+such as a subclass of `Rails::Engine` or `Rails::Application`.
 
 #### `config.action_on_early_load_hook`
 
 Controls what happens when a load hook is violated before the Rails application is initialized.
-The value is `:log` by default, which will log when a load hook is invoked early. The value can alternatively be `raise`, which will raise a `LoadError` instead of logging.
+The value is `:log` by default, which will log when a load hook is invoked early. The value can alternatively be `:raise`, which will raise a `LoadError` instead of logging.
 
 #### `config.add_autoload_paths_to_load_path`
 
@@ -4617,245 +4608,3 @@ server {
 
 Be sure to read the [NGINX documentation](https://nginx.org/en/docs/) for the most up-to-date information.
 
-
-
-### `Rails::Railtie#initializer`
-
-Rails has several initializers that run on startup that are all defined by using the `initializer` method from `Rails::Railtie`. Here's an example of the `set_helpers_path` initializer from Action Controller:
-
-```ruby
-initializer "action_controller.set_helpers_path" do |app|
-  ActionController::Helpers.helpers_path = app.helpers_paths
-end
-```
-
-The `initializer` method takes three arguments with the first being the name for the initializer and the second being an options hash (not shown here) and the third being a block. The `:before` key in the options hash can be specified to specify which initializer this new initializer must run before, and the `:after` key will specify which initializer to run this initializer _after_.
-
-Initializers defined using the `initializer` method will be run in the order they are defined in, with the exception of ones that use the `:before` or `:after` methods.
-
-WARNING: You may put your initializer before or after any other initializer in the chain, as long as it is logical. Say you have 4 initializers called "one" through "four" (defined in that order) and you define "four" to go _before_ "two" but _after_ "three", that just isn't logical and Rails will not be able to determine your initializer order.
-
-The block argument of the `initializer` method is the instance of the application itself, and so we can access the configuration on it by using the `config` method as done in the example.
-
-Because `Rails::Application` inherits from `Rails::Railtie` (indirectly), you can use the `initializer` method in `config/application.rb` to define initializers for the application.
-
-### Initializers
-
-Below is a comprehensive list of all the initializers found in Rails in the order that they are defined (and therefore run in, unless otherwise stated).
-
-* `load_environment_hook`: Serves as a placeholder so that `:load_environment_config` can be defined to run before it.
-
-* `load_active_support`: Optionally requires `active_support/all` if `config.active_support.bare` is un-truthful, which is the default.
-
-* `initialize_logger`: Initializes the logger (an `ActiveSupport::BroadcastLogger` object) for the application and makes it accessible at `Rails.logger`, provided that no initializer inserted before this point has defined `Rails.logger`.
-
-* `initialize_cache`: If `Rails.cache` isn't set yet, initializes the cache by referencing the value in `config.cache_store` and stores the outcome as `Rails.cache`. If this object responds to the `middleware` method, its middleware is inserted before `Rack::Runtime` in the middleware stack.
-
-* `set_clear_dependencies_hook`: This initializer - which runs only if `config.enable_reloading` is set to `true` - uses `ActionDispatch::Callbacks.after` to remove the constants which have been referenced during the request from the object space so that they will be reloaded during the following request.
-
-* `bootstrap_hook`: Runs all configured `before_initialize` blocks.
-
-* `i18n.callbacks`: In the development environment, sets up a `to_prepare` callback which will call `I18n.reload!` if any of the locales have changed since the last request. In production this callback will only run on the first request.
-
-* `active_support.deprecation_behavior`: Sets up deprecation reporting behavior for [`Rails.application.deprecators`][] based on [`config.active_support.report_deprecations`](#config-active-support-report-deprecations), [`config.active_support.deprecation`](#config-active-support-deprecation), [`config.active_support.disallowed_deprecation`](#config-active-support-disallowed-deprecation), and [`config.active_support.disallowed_deprecation_warnings`](#config-active-support-disallowed-deprecation-warnings).
-
-* `active_support.initialize_time_zone`: Sets the default time zone for the application based on the `config.time_zone` setting, which defaults to "UTC".
-
-* `active_support.initialize_beginning_of_week`: Sets the default beginning of week for the application based on `config.beginning_of_week` setting, which defaults to `:monday`.
-
-* `active_support.set_configs`: Sets up Active Support by using the settings in `config.active_support` by `send`'ing the method names as setters to `ActiveSupport` and passing the values through.
-
-* `action_dispatch.configure`: Configures the `ActionDispatch::Http::URL.tld_length` to be set to the value of `config.action_dispatch.tld_length`.
-
-* `action_view.set_configs`: Sets up Action View by using the settings in `config.action_view` by `send`'ing the method names as setters to `ActionView::Base` and passing the values through.
-
-* `action_controller.assets_config`: Initializes the `config.action_controller.assets_dir` to the app's public directory if not explicitly configured.
-
-* `action_controller.set_helpers_path`: Sets Action Controller's `helpers_path` to the application's `helpers_path`.
-
-* `action_controller.parameters_config`: Configures strong parameters options for `ActionController::Parameters`.
-
-* `action_controller.set_configs`: Sets up Action Controller by using the settings in `config.action_controller` by `send`'ing the method names as setters to `ActionController::Base` and passing the values through.
-
-* `action_controller.compile_config_methods`: Initializes methods for the config settings specified so that they are quicker to access.
-
-* `active_record.initialize_timezone`: Sets `ActiveRecord::Base.time_zone_aware_attributes` to `true`, as well as setting `ActiveRecord::Base.default_timezone` to UTC. When attributes are read from the database, they will be converted into the time zone specified by `Time.zone`.
-
-* `active_record.logger`: Sets `ActiveRecord::Base.logger` - if it's not already set - to `Rails.logger`.
-
-* `active_record.migration_error`: Configures middleware to check for pending migrations.
-
-* `active_record.check_schema_cache_dump`: Loads the schema cache dump if configured and available.
-
-* `active_record.set_configs`: Sets up Active Record by using the settings in `config.active_record` by `send`'ing the method names as setters to `ActiveRecord::Base` and passing the values through.
-
-* `active_record.initialize_database`: Loads the database configuration (by default) from `config/database.yml` and establishes a connection for the current environment.
-
-* `active_record.log_runtime`: Includes `ActiveRecord::Railties::ControllerRuntime` and `ActiveRecord::Railties::JobRuntime` which are responsible for reporting the time taken by Active Record calls for the request back to the logger.
-
-* `active_record.set_reloader_hooks`: Resets all reloadable connections to the database if `config.enable_reloading` is set to `true`.
-
-* `active_record.add_watchable_files`: Adds `schema.rb` and `structure.sql` files to watchable files.
-
-* `active_job.logger`: Sets `ActiveJob::Base.logger` - if it's not already set -
-  to `Rails.logger`.
-
-* `active_job.set_configs`: Sets up Active Job by using the settings in `config.active_job` by `send`'ing the method names as setters to `ActiveJob::Base` and passing the values through.
-
-* `action_mailer.logger`: Sets `ActionMailer::Base.logger` - if it's not already set - to `Rails.logger`.
-
-* `action_mailer.set_configs`: Sets up Action Mailer by using the settings in `config.action_mailer` by `send`'ing the method names as setters to `ActionMailer::Base` and passing the values through.
-
-* `action_mailer.compile_config_methods`: Initializes methods for the config settings specified so that they are quicker to access.
-
-* `set_load_path`: This initializer runs before `bootstrap_hook`. Adds paths
-  specified by `config.paths.load_paths` to `$LOAD_PATH`. And unless you set
-  `config.add_autoload_paths_to_load_path` to `false`, it will also add all
-  autoload paths specified by `config.autoload_paths`,
-  `config.eager_load_paths`, `config.autoload_once_paths`.
-
-* `set_autoload_paths`: This initializer runs before `bootstrap_hook`. Adds all sub-directories of `app` and paths specified by `config.autoload_paths`, `config.eager_load_paths` and `config.autoload_once_paths` to `ActiveSupport::Dependencies.autoload_paths`.
-
-* `add_routing_paths`: Loads (by default) all `config/routes.rb` files (in the application and railties, including engines) and sets up the routes for the application.
-
-* `add_locales`: Adds the files in `config/locales` (from the application, railties, and engines) to `I18n.load_path`, making available the translations in these files.
-
-* `add_view_paths`: Adds the directory `app/views` from the application, railties, and engines to the lookup path for view files for the application.
-
-* `add_mailer_preview_paths`: Adds the directory `test/mailers/previews` from the application, railties, and engines to the lookup path for mailer preview files for the application.
-
-* `load_environment_config`: This initializer runs before `load_environment_hook`. Loads the `config/environments` file for the current environment.
-
-* `prepend_helpers_path`: Adds the directory `app/helpers` from the application, railties, and engines to the lookup path for helpers for the application.
-
-* `load_config_initializers`: Loads all Ruby files from `config/initializers` in the application, railties, and engines. The files in this directory can be used to hold configuration settings that should be made after all of the frameworks are loaded.
-
-* `engines_blank_point`: Provides a point-in-initialization to hook into if you wish to do anything before engines are loaded. After this point, all railtie and engine initializers are run.
-
-* `add_generator_templates`: Finds templates for generators at `lib/templates` for the application, railties, and engines, and adds these to the `config.generators.templates` setting, which will make the templates available for all generators to reference.
-
-* `ensure_autoload_once_paths_as_subset`: Ensures that the `config.autoload_once_paths` only contains paths from `config.autoload_paths`. If it contains extra paths, then an exception will be raised.
-
-* `add_to_prepare_blocks`: The block for every `config.to_prepare` call in the application, a railtie, or engine is added to the `to_prepare` callbacks for Action Dispatch which will be run per request in development, or before the first request in production.
-
-* `add_builtin_route`: If the application is running under the development environment then this will append the route for `rails/info/properties` to the application routes. This route provides the detailed information such as Rails and Ruby version for `public/index.html` in a default Rails application.
-
-* `build_middleware_stack`: Builds the middleware stack for the application, returning an object which has a `call` method which takes a Rack environment object for the request.
-
-* `eager_load!`: If `config.eager_load` is `true`, runs the `config.before_eager_load` hooks and then calls `eager_load!` which will load all `config.eager_load_namespaces`.
-
-* `finisher_hook`: Provides a hook for after the initialization of process of the application is complete, as well as running all the `config.after_initialize` blocks for the application, railties, and engines.
-
-* `set_routes_reloader_hook`: Configures Action Dispatch to reload the routes file using `ActiveSupport::Callbacks.to_run`.
-
-* `disable_dependency_loading`: Disables the automatic dependency loading if the `config.eager_load` is set to `true`.
-
-[`Rails.application.deprecators`]: https://api.rubyonrails.org/classes/Rails/Application.html#method-i-deprecators
-
-Database Pooling
-----------------
-
-Active Record database connections are managed by [`ActiveRecord::ConnectionAdapters::ConnectionPool`][] which ensures that a connection pool synchronizes the amount of thread access to a limited number of database connections. This limit defaults to 5 and can be configured in `database.yml`.
-
-```yaml
-development:
-  adapter: sqlite3
-  database: storage/development.sqlite3
-  pool: 5
-  timeout: 5000
-```
-
-Since the connection pooling is handled inside of Active Record by default, all application servers (Thin, Puma, Unicorn, etc.) should behave the same. The database connection pool is initially empty. As demand for connections increases it will create them until it reaches the connection pool limit.
-
-Any one request will check out a connection the first time it requires access to the database. At the end of the request it will check the connection back in. This means that the additional connection slot will be available again for the next request in the queue.
-
-If you try to use more connections than are available, Active Record will block
-you and wait for a connection from the pool. If it cannot get a connection, a
-timeout error similar to that given below will be thrown.
-
-```
-ActiveRecord::ConnectionTimeoutError - could not obtain a database connection within 5.000 seconds (waited 5.000 seconds)
-```
-
-If you get the above error, you might want to increase the size of the
-connection pool by incrementing the `pool` option in `database.yml`
-
-NOTE. If you are running in a multi-threaded environment, there could be a chance that several threads may be accessing multiple connections simultaneously. So depending on your current request load, you could very well have multiple threads contending for a limited number of connections.
-
-[`ActiveRecord::ConnectionAdapters::ConnectionPool`]: https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/ConnectionPool.html
-
-Custom Configuration
---------------------
-
-You can configure your own code through the Rails configuration object with
-custom configuration under either the `config.x` namespace, or `config` directly.
-The key difference between these two is that you should be using `config.x` if you
-are defining _nested_ configuration (ex: `config.x.nested.hi`), and just
-`config` for _single level_ configuration (ex: `config.hello`).
-
-```ruby
-config.x.payment_processing.schedule = :daily
-config.x.payment_processing.retries  = 3
-config.super_debugger = true
-```
-
-These configuration points are then available through the configuration object:
-
-```ruby
-Rails.configuration.x.payment_processing.schedule # => :daily
-Rails.configuration.x.payment_processing.retries  # => 3
-Rails.configuration.x.payment_processing.not_set  # => nil
-Rails.configuration.super_debugger                # => true
-```
-
-You can also use `Rails::Application.config_for` to load whole configuration files:
-
-```yaml
-# config/payment.yml
-production:
-  environment: production
-  merchant_id: production_merchant_id
-  public_key:  production_public_key
-  private_key: production_private_key
-
-development:
-  environment: sandbox
-  merchant_id: development_merchant_id
-  public_key:  development_public_key
-  private_key: development_private_key
-```
-
-```ruby
-# config/application.rb
-module MyApp
-  class Application < Rails::Application
-    config.payment = config_for(:payment)
-  end
-end
-```
-
-```ruby
-Rails.configuration.payment["merchant_id"] # => production_merchant_id or development_merchant_id
-```
-
-`Rails::Application.config_for` supports a `shared` configuration to group common
-configurations. The shared configuration will be merged into the environment
-configuration.
-
-```yaml
-# config/example.yml
-shared:
-  foo:
-    bar:
-      baz: 1
-
-development:
-  foo:
-    bar:
-      qux: 2
-```
-
-```ruby
-# development environment
-Rails.application.config_for(:example)[:foo][:bar] #=> { baz: 1, qux: 2 }
-```

@@ -720,3 +720,34 @@ much more.
 
 You can learn more about associations in the [Active Record Associations
 guide](association_basics.html).
+
+Connection Pool
+---------------
+
+Active Record manages connections to the database using a shared connection
+pool (implemented by [`ActiveRecord::ConnectionAdapters::ConnectionPool`][]).
+The pool creates database connections as required, until a configured
+maximum is reached.
+
+Requests check out a connection from this shared pool when they
+require database access, and returns it after completing its work.
+This ensures the database isn't overwhelmed when the application is
+under load.
+
+If there are no available connections, Active Record will block
+the request until one becomes available. If it cannot get a
+connection within the timeout window, an
+`ActiveRecord::ConnectionTimeoutError` error will be thrown.
+
+The default for maximum connections is `5` and the timeout
+is `5000` (milliseconds). Both options are configured in `database.yml`.
+
+```yaml
+development:
+  adapter: sqlite3
+  database: storage/development.sqlite3
+  pool: 5
+  timeout: 5000
+```
+
+[`ActiveRecord::ConnectionAdapters::ConnectionPool`]: https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/ConnectionPool.html
