@@ -218,7 +218,8 @@ initialization process — for example, to apply a
 configuration setting after a gem has initialized.
 
 Since the load order of your application's initializers is not
-guaranteed, nor is the fact that they will be run after all gem's have initialized, Rails provides a number of initialization
+guaranteed, nor is the fact that they will be run after all gems have
+initialized, Rails provides a number of initialization
 events. You can hook into these events to run code at specific times.
 
 The events are listed below in the order in which they are run:
@@ -302,7 +303,7 @@ up at the point where the `after_initialize` block is called.
 
 ### Load Hooks
 
-Rails is modular, and composed of several frameworks such as Active
+Rails is modular, and composed of several sub-frameworks such as Active
 Record, Action Dispatch etc. Load hooks allow you to hook into the
 loading of these frameworks to run your own initialization code. This
 way, your application won't cause conflicts by arbitrarily
@@ -342,10 +343,6 @@ For example, if you search for
 ```ruby
 ActiveSupport.run_load_hooks(:active_record, Base)
 ```
-
-You can see that `Base` is passed as an argument when the hooks are
-run, meaning that's the hooks will be evaluated within the context
-of that object.
 
 #### List of Load Hooks
 
@@ -423,11 +420,11 @@ options available for use, and what they control.
 
 Some components such as Action Mailer may hold their settings under their
 own namespace — for example `ActionMailer::Base.options`. Never use this
-API directly. These components integrate with Rails configuration object
+API directly. These components integrate with the Rails configuration object
 to ensure settings are loaded correctly. Always use the Rails
 configuration object instead: `Rails.app.config.action_mailer.options`.
 
-NOTE: If you need to apply configuration directly to a class, use a
+NOTE: If you need to apply a configuration setting directly to a class, use a
 [lazy load hook](https://api.rubyonrails.org/classes/ActiveSupport/LazyLoadHooks.html)
 in an initializer to avoid autoloading the class before
 initialization has completed.
@@ -446,8 +443,8 @@ module MyRailsApp
 end
 ```
 
-This design gives enables you to load the default settings for an
-older version of Rails than the one you're running, if you need to.
+This design enables you to load the default settings for an
+older version of Rails than the one you're running.
 This makes Rails upgrades easier as you can incrementally make the app
 changes required for compatibility with the latest defaults without
 being stuck on any particular Rails version.
@@ -462,25 +459,33 @@ such as a subclass of `Rails::Engine` or `Rails::Application`.
 
 #### `config.action_on_early_load_hook`
 
-Controls what happens when a load hook is violated before the Rails application is initialized.
-The value is `:log` by default, which will log when a load hook is invoked early. The value can alternatively be `:raise`, which will raise a `LoadError` instead of logging.
+Controls what happens when a load hook is triggered before the Rails
+application is initialized. It's set to `:log` by default. You can
+alternatively set it to `:raise`, which will raise a `LoadError`
+instead of logging the violation.
 
 #### `config.add_autoload_paths_to_load_path`
 
-Says whether autoload paths have to be added to `$LOAD_PATH`. It is recommended to be set to `false` in `:zeitwerk` mode early, in `config/application.rb`. Zeitwerk uses absolute paths internally, and applications running in `:zeitwerk` mode do not need `require_dependency`, so models, controllers, jobs, etc. do not need to be in `$LOAD_PATH`. Setting this to `false` saves Ruby from checking these directories when resolving `require` calls with relative paths, and saves Bootsnap work and RAM, since it does not need to build an index for them.
+Sets whether the Rails autoload paths are added to Ruby's `$LOAD_PATH`.
+The default value is `false`.
 
-The default value depends on the `config.load_defaults` target version:
+Files in the autoload paths are required
+by Rails' autoloader (powered by [Zeitwerk](https://github.com/fxn/zeitwerk))
+using absolute paths, and hence don't need to be defined in Ruby's `$LOAD_PATH`.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `true`               |
-| 7.1                   | `false`              |
+Excluding these paths from the `$LOAD_PATH` reduces the work Ruby has to do when
+resolving `require` calls with relative paths, and improves Bootsnap's performance
+as it has to index fewer files.
 
-The `lib` directory is not affected by this flag, it is added to `$LOAD_PATH` always.
+The `lib` folder always added to `$LOAD_PATH`.
 
 #### `config.after_initialize`
 
-Takes a block which will be run _after_ Rails has finished initializing the application. That includes the initialization of the framework itself, engines, and all the application's initializers in `config/initializers`. Note that this block _will_ be run for rake tasks. Useful for configuring values set up by other initializers:
+Takes a block which will be run _after_ Rails has finished initializing
+the application. That includes the initialization of the framework
+itself, engines, and all the application's initializers in
+`config/initializers`. It's a usefule place to configure values
+set up by other initializers:
 
 ```ruby
 config.after_initialize do
@@ -488,9 +493,13 @@ config.after_initialize do
 end
 ```
 
+NOTE: This block _will_ be run for Rake tasks.
+
 #### `config.after_routes_loaded`
 
-Takes a block which will be run after Rails has finished loading the application routes. This block will also be run whenever routes are reloaded.
+Takes a block which will be run after Rails has
+finished loading the application's routes. This block will also
+be run whenever routes are reloaded.
 
 ```ruby
 config.after_routes_loaded do
@@ -500,79 +509,151 @@ end
 
 #### `config.allow_concurrency`
 
-Controls whether requests should be handled concurrently. This should only
-be set to `false` if application code is not thread safe. Defaults to `true`.
+Controls whether requests should be handled concurrently. This
+should only be set to `false` if application code is not thread
+safe. Defaults to `true`.
 
 #### `config.asset_host`
 
-Sets the host for the assets. Useful when CDNs are used for hosting assets, or when you want to work around the concurrency constraints built-in in browsers using different domain aliases. Shorter version of `config.action_controller.asset_host`.
+Configures the host name for your application's assets. Set this when
+serving assets using a CDN, or to work around the concurrency constraints
+in browsers by using different domain aliases.
+
+This setting is shorthand for `config.action_controller.asset_host`.
 
 #### `config.assume_ssl`
 
-Makes application believe that all requests are arriving over SSL. This is useful when proxying through a load balancer that terminates SSL, the forwarded request will appear as though it's HTTP instead of HTTPS to the application. This makes redirects and cookie security target HTTP instead of HTTPS. This middleware makes the server assume that the proxy already terminated SSL, and that the request really is HTTPS.
+Makes application believe that all requests are arriving over SSL. This
+is useful when proxying through a load balancer that terminates SSL,
+the forwarded request will appear as though it's HTTP instead of
+HTTPS to the application. This makes redirects and cookie security
+target HTTP instead of HTTPS. This middleware makes the server assume
+that the proxy already terminated SSL, and that the request really
+is HTTPS.
+
+The default value is `false`.
 
 #### `config.autoflush_log`
 
-Enables writing log file output immediately instead of buffering. Defaults to
-`true`.
+Controls whether writing to log files is buffered (`false`)
+or written immediately (`true`). Defaults to `true`.
+
+#### `config.autoload_once_paths`
+
+Accepts an array of paths from which Rails will autoload constants
+that won't be wiped per request. This option is relevant only if reloading
+is enabled, which it is by default in the `development` environment.
+
+Otherwise, all autoloading happens only once. All elements
+of this array must also be  in `autoload_paths`. Default is an empty array.
+
+#### `config.autoload_paths`
+
+Accepts an array of paths from which Rails will autoload constants.
+The default is an empty array.
+
+Setting this option is not recommended, and it is retained for legacy reasons.
+See [Autoloading and Reloading Constants](autoloading_and_reloading_constants.html#config-autoload-paths)
+for more details.
 
 #### `config.autoload_lib(ignore:)`
 
-This method adds `lib` to `config.autoload_paths` and `config.eager_load_paths`.
+Adds the `lib` folder to `config.autoload_paths` and `config.eager_load_paths`.
 
-Normally, the `lib` directory has subdirectories that should not be autoloaded or eager loaded. Please, pass their name relative to `lib` in the required `ignore` keyword argument. For example,
+You may have sub-directories in the `lib` folder that should not be
+autoloaded or eager loaded. Use the `ignore` option to exclude these
+using their relative paths:
 
 ```ruby
 config.autoload_lib(ignore: %w(assets tasks generators))
 ```
 
-Please, see more details in the [autoloading guide](autoloading_and_reloading_constants.html).
+More details can be found in the
+[autoloading guide](autoloading_and_reloading_constants.html).
 
 #### `config.autoload_lib_once(ignore:)`
 
-The method `config.autoload_lib_once` is similar to `config.autoload_lib`, except that it adds `lib` to `config.autoload_once_paths` instead.
+`config.autoload_lib_once` adds the `lib` folder to `config.autoload_once_paths`.
 
-By calling `config.autoload_lib_once`, classes and modules in `lib` can be autoloaded, even from application initializers, but won't be reloaded.
+This means that classes and modules in `lib` will be autoloaded when the Rails app
+first boots, but they will not be reloaded automatically when you make code changes.
 
-#### `config.autoload_once_paths`
+Use the `ignore` option to exclude sub-folders from being autoloaded exactly like
+`config.autoload_lib`.
 
-Accepts an array of paths from which Rails will autoload constants that won't be wiped per request. Relevant if reloading is enabled, which it is by default in the `development` environment. Otherwise, all autoloading happens only once. All elements of this array must also be in `autoload_paths`. Default is an empty array.
-
-#### `config.autoload_paths`
-
-Accepts an array of paths from which Rails will autoload constants. Default is an empty array. Since [Rails 6](upgrading_ruby_on_rails.html#autoloading), it is not recommended to adjust this. See [Autoloading and Reloading Constants](autoloading_and_reloading_constants.html#config-autoload-paths).
+```ruby
+config.autoload_lib_once(ignore: %w(assets tasks generators))
+```
 
 #### `config.beginning_of_week`
 
-Sets the default beginning of week for the
-application. Accepts a valid day of week as a symbol (e.g. `:monday`).
+Sets the default beginning of week for the application.
+
+Accepts a valid day of week as a symbol (`:monday`, `:tuesday`, etc.).
 
 #### `config.cache_classes`
 
-Old setting equivalent to `!config.enable_reloading`. Supported for backwards compatibility.
+Legacy setting equivalent to `!config.enable_reloading`. Retained
+for backwards compatibility.
 
 #### `config.cache_store`
 
-Configures which cache store to use for Rails caching. Options include one of the symbols `:memory_store`, `:file_store`, `:mem_cache_store`, `:null_store`, `:redis_cache_store`, or an object that implements the cache API. Defaults to `:file_store`. See [Cache Stores](caching_with_rails.html#other-cache-stores) for per-store configuration options.
+Configures the cache store for Rails caching. Available options are:
+
+* `:memory_store`
+* `:file_store`
+* `:mem_cache_store`
+* `:null_store`
+* `:redis_cache_store`
+* `:solid_cache_store`
+
+You may also define an object that implements the cache API.
+
+The default values in each environment are:
+
+| Environment     | Cache Store          |
+|-----------------|----------------------|
+| `development`   | `:memory_store`      |
+| `test`          | `:null_store`        |
+| `production`    | `:solid_cache_store` |
+
+See [Cache Stores](caching_with_rails.html#other-cache-stores) for per-store
+configuration options.
+
+NOTE: `solid_cache_store` requires the [`solid_cache`](https://github.com/rails/solid_cache/)
+gem which is installed by default.
 
 #### `config.colorize_logging`
 
-Specifies whether or not to use ANSI color codes when logging information. Defaults to `true`.
+Specifies whether or not to use ANSI color codes when logging
+information. Defaults to `true`.
 
 #### `config.consider_all_requests_local`
 
-Is a flag. If `true` then any error will cause detailed debugging information to be dumped in the HTTP response, and the `Rails::Info` controller will show the application runtime context in `/rails/info/properties`. `true` by default in the development and test environments, and `false` in production. For finer-grained control, set this to `false` and implement `show_detailed_exceptions?` in controllers to specify which requests should provide debugging information on errors.
+Controls whether error details will be written to the HTTP response body
+for debugging.
+
+When `true`, error details are returned in the HTTP response, and
+can be viewed and debugged in the browser.
+
+The default value in the `development` environment is `true`, and for
+`production` it is `false`.
+
+For more fine grained control, set this to `false` and
+implement `show_detailed_exceptions?` in controllers to specify
+which requests should provide debugging information on errors.
 
 #### `config.console`
 
-Allows you to set the class that will be used as console when you run `bin/rails console`. It's best to run it in the `console` block:
+Sets the class that will be used as the console when you run `bin/rails console`.
 
 ```ruby
-console do
-  # this block is called only when running console,
-  # so we can safely require pry here
+# config/initializers/console.rb
+
+# This block is called only when running the Rails console
+Rails.app.console do
   require "pry"
-  config.console = Pry
+  Rails.app.config.console = Pry
 end
 ```
 
@@ -595,10 +676,10 @@ Guide
 
 #### `config.credentials.content_path`
 
-The path of the encrypted credentials file.
+The path to the encrypted credentials file.
 
-Defaults to `config/credentials/#{Rails.env}.yml.enc` if it exists, or
-`config/credentials.yml.enc` otherwise.
+Defaults to `config/credentials/#{Rails.env}.yml.enc` if it exists, falling back
+to `config/credentials.yml.enc`.
 
 NOTE: In order for the `bin/rails credentials` commands to recognize this value,
 it must be set in `config/application.rb` or `config/environments/#{Rails.env}.rb`.
@@ -607,48 +688,64 @@ it must be set in `config/application.rb` or `config/environments/#{Rails.env}.r
 
 The path of the encrypted credentials key file.
 
-Defaults to `config/credentials/#{Rails.env}.key` if it exists, or
-`config/master.key` otherwise.
+Defaults to `config/credentials/#{Rails.env}.key` if it exists, falling back
+to `config/master.key`.
 
-NOTE: In order for the `bin/rails credentials` commands to recognize this value,
-it must be set in `config/application.rb` or `config/environments/#{Rails.env}.rb`.
+NOTE: In order for the `bin/rails credentials` commands to recognize this
+value, it must be set in `config/application.rb` or
+`config/environments/#{Rails.env}.rb`.
 
 #### `config.debug_exception_response_format`
 
-Sets the format used in responses when errors occur in the development environment. Defaults to `:api` for API only apps and `:default` for normal apps.
+Sets the format used in responses when errors occur in the
+development environment.
+
+The default value is `:default`, and for API-only apps it is `:api`.
 
 #### `config.disable_sandbox`
 
-Controls whether or not someone can start a console in sandbox mode. This is helpful to avoid a long running session of sandbox console, that could lead a database server to run out of memory. Defaults to `false`.
+Controls whether or not the Rails console can be started in sandbox mode.
+
+A long running sandbox console sesion may lead a database server to run out
+of memory. This setting can be used to prevent such an occurrence.
+
+Defaults to `false`.
 
 #### `config.dom_testing_default_html_version`
 
-Controls whether an HTML4 parser or an HTML5 parser is used by default by the test helpers in Action View, Action Dispatch, and `rails-dom-testing`.
+Sets the HTML parser used by the test helpers in Action View,
+Action Dispatch, and `rails-dom-testing`.
 
-The default value depends on the `config.load_defaults` target version:
+The default value is `:html5`, and `:html4` is a valid alternative.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:html4`             |
-| 7.1                   | `:html5` (see NOTE)  |
-
-NOTE: Nokogiri's HTML5 parser is not supported on JRuby, so on JRuby platforms Rails will fall back to `:html4`.
+NOTE: Nokogiri's HTML5 parser is not supported on JRuby, so on JRuby platforms
+Rails will fall back to `:html4`.
 
 #### `config.eager_load`
 
-When `true`, eager loads all registered `config.eager_load_namespaces`. This includes your application, engines, Rails frameworks, and any other registered namespace.
+When `true`, eager loads all registered `config.eager_load_namespaces`.
+This includes your application, engines, Rails frameworks, and any other
+registered namespace.
 
 #### `config.eager_load_namespaces`
 
-Registers namespaces that are eager loaded when `config.eager_load` is set to `true`. All namespaces in the list must respond to the `eager_load!` method.
+Registers namespaces that are eager loaded when `config.eager_load` is
+set to `true`. All namespaces in the list must respond to the `eager_load!`
+method.
 
 #### `config.eager_load_paths`
 
-Accepts an array of paths from which Rails will eager load on boot if `config.eager_load` is true. Defaults to every folder in the `app` directory of the application.
+Accepts an array of paths from which Rails will eager load on boot
+if `config.eager_load` is true. Defaults to every folder in the
+`app` directory of the application.
 
 #### `config.enable_reloading`
 
-If `config.enable_reloading` is true, application classes and modules are reloaded in between web requests if they change. Defaults to `true` in the `development` environment, and `false` in the `production` environment.
+If `config.enable_reloading` is true, application classes and modules are
+reloaded in between web requests if they change.
+
+Defaults to `true` in the `development` environment,
+and `false` in `production`.
 
 The predicate `config.reloading_enabled?` is also defined.
 
@@ -658,33 +755,35 @@ Sets up the application-wide encoding. Defaults to UTF-8.
 
 #### `config.exceptions_app`
 
-Sets the exceptions application invoked by the `ShowException` middleware when an exception happens.
+Sets the exceptions Rack application invoked by the `ShowException`
+middleware when an exception happens.
+
 Defaults to `ActionDispatch::PublicExceptions.new(Rails.public_path)`.
 
 #### `config.file_watcher`
 
-Is the class used to detect file updates in the file system when `config.reload_classes_only_on_change` is `true`. Rails ships with `ActiveSupport::FileUpdateChecker`, the default, and `ActiveSupport::EventedFileUpdateChecker`. Custom classes must conform to the `ActiveSupport::FileUpdateChecker` API.
+Registers the class used to detect file updates in the file system when
+`config.reload_classes_only_on_change` is `true`.
 
-Using `ActiveSupport::EventedFileUpdateChecker` depends on the [listen](https://github.com/guard/listen) gem:
+Rails ships with `ActiveSupport::FileUpdateChecker` (the default), and `ActiveSupport::EventedFileUpdateChecker`. Custom classes must conform to
+the `ActiveSupport::FileUpdateChecker` API.
 
-```ruby
-group :development do
-  gem "listen", "~> 3.5"
-end
-```
+Using `ActiveSupport::EventedFileUpdateChecker` depends on
+the [listen](https://github.com/guard/listen) gem.
 
-On Linux and macOS no additional gems are needed, but some are required
-[for *BSD](https://github.com/guard/listen#on-bsd) and
+On Linux and macOS no additional gems are needed, but some are
+required [for \*BSD](https://github.com/guard/listen#on-bsd) and
 [for Windows](https://github.com/guard/listen#on-windows).
 
 Note that [some setups are unsupported](https://github.com/guard/listen#issues--limitations).
 
 #### `config.filter_parameters`
 
-Used for filtering out the parameters that you don't want shown in the logs,
+Used for filtering parameters that shouldn't be revealed in the logs,
 such as passwords or credit card numbers. It also filters out sensitive values
-of database columns when calling `#inspect` on an Active Record object. By
-default, Rails filters out passwords by adding the following filters in
+of database columns when calling `#inspect` on an Active Record object.
+
+By default, Rails filters out passwords by adding the following filters in
 `config/initializers/filter_parameter_logging.rb`.
 
 ```ruby
@@ -693,7 +792,8 @@ Rails.application.config.filter_parameters += [
 ]
 ```
 
-Parameters filter works by partial matching regular expression.
+The filter works by partial matching regular expressions. Matched parameters
+will be replaced in the logs with `[FILTERED]`.
 
 #### `config.filter_redirect`
 
@@ -703,12 +803,20 @@ Used for filtering out redirect urls from application logs.
 Rails.application.config.filter_redirect += ["s3.amazonaws.com", /private-match/]
 ```
 
-The redirect filter works by testing that urls include strings or match regular
-expressions.
+The redirect filter tests whether a URL includes strings or matches regular
+expressions defined in the array. Matched URLs will be replaced in the logs with
+`[FILTERED]`
 
 #### `config.force_ssl`
 
-Forces all requests to be served over HTTPS, and sets "https://" as the default protocol when generating URLs. Enforcement of HTTPS is handled by the `ActionDispatch::SSL` middleware, which can be configured via `config.ssl_options`.
+Setting this to `true` enables the
+[HSTS HTTP header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security) for all HTTP responses which tells the client to communicate with
+the host over HTTPS only.
+
+It will also "https://" as the default protocol when generating URLs.
+
+This functionality is implemented by the `ActionDispatch::SSL` middleware,
+which can be configured via [`config.ssl_options`](#config-ssl-options).
 
 #### `config.helpers_paths`
 
@@ -721,65 +829,125 @@ middleware](#actiondispatch-hostauthorization)
 
 #### `config.hosts`
 
-An array of strings, regular expressions, or `IPAddr` used to validate the
+An array of strings, regular expressions, or `IPAddr` objects used to validate the
 `Host` header. Used by the [HostAuthorization
 middleware](#actiondispatch-hostauthorization) to help prevent DNS rebinding
 attacks.
 
 #### `config.javascript_path`
 
-Sets the path where your app's JavaScript lives relative to the `app` directory and the default value is `javascript`.
+Sets the path where your app's JavaScript lives relative to the
+`app` directory. The default value is `javascript`.
+
 An app's configured `javascript_path` will be excluded from `autoload_paths`.
 
 #### `config.log_file_size`
 
-Defines the maximum size of the Rails log file in bytes. Defaults to `104_857_600` (100 MiB) in development and test, and unlimited in all other environments.
+Defines the maximum size of the Rails log file in bytes.
+Defaults to `104_857_600` (100 MiB) in the `development` and `test`
+environments, and unlimited in `production`.
+
+Ensure you configure log rotation on your server to prevent logs from
+filling up the entire disk.
 
 #### `config.log_formatter`
 
-Defines the formatter of the Rails logger. This option defaults to an instance of `ActiveSupport::Logger::SimpleFormatter` for all environments. If you are setting a value for `config.logger` you must manually pass the value of your formatter to your logger before it is wrapped in an `ActiveSupport::TaggedLogging` instance, Rails will not do it for you.
+Defines the formatter of the Rails logger. The default is an
+instance of `ActiveSupport::Logger::SimpleFormatter`.
+
+If you register a custom logger using [`config.logger`](#config-logger) you
+need to manually pass the formatter to your logger before registering it.
+Rails will not automatically assign the value of this setting to a
+custom logger.
 
 #### `config.log_level`
 
-Defines the verbosity of the Rails logger. This option defaults to `:debug` for all environments except production, where it defaults to `:info`. The available log levels are: `:debug`, `:info`, `:warn`, `:error`, `:fatal`, and `:unknown`.
+Defines the verbosity of the Rails logger. This option defaults
+to `:debug` for all environments except production, where it
+defaults to `:info`.
+
+The available log levels are:
+
+* `:debug`
+* `:info`
+* `:warn`
+* `:error`
+* `:fatal`
+* `:unknown`
 
 #### `config.log_tags`
 
-Accepts a list of methods that the `request` object responds to, a `Proc` that accepts the `request` object, or something that responds to `to_s`. This makes it easy to tag log lines with debug information like subdomain and request id - both very helpful in debugging multi-user production applications.
+Used to define _tags_ for each log entry.
+
+It accepts an array of methods that the `request` object responds to, or
+a `Proc` that accepts the `request` object, or an object that responds
+to `to_s`.
 
 #### `config.logger`
 
-Is the logger that will be used for `Rails.logger` and any related Rails logging such as `ActiveRecord::Base.logger`. It defaults to an instance of `ActiveSupport::TaggedLogging` that wraps an instance of `ActiveSupport::Logger` which outputs a log to the `log/` directory. You can supply a custom logger, to get full compatibility you must follow these guidelines:
+Configures the logger to use to write Rails application logs.
+The default is `ActiveSupport::Logger` with support for tags via
+`ActiveSupport::TaggedLogging`.
 
-* To support a formatter, you must manually assign a formatter from the `config.log_formatter` value to the logger.
-* To support tagged logs, the log instance must be wrapped with `ActiveSupport::TaggedLogging`.
-* To support silencing, the logger must include `ActiveSupport::LoggerSilence` module. The `ActiveSupport::Logger` class already includes these modules.
+The logger assigned using this method will be wrapped by an instance
+of `ActiveSupport::BroadcastLogger`. This class contains multiple _broadcasts_
+which are instances of logger objects such as `ActiveSupport::Logger`.
+
+This design allows Rails to log to multiple targets simultaneously, such a file as well
+as `STDOUT`.
+
+`Rails.logger` will always return an instance of `ActiveSupport::BroadcastLogger`
+even when you assign a custom logger. Your custom logger will be assigned as a _broadcast_
+within `ActiveSupport::BroadcastLogger`.
+
+These are the default log destinations for each environment:
+
+| Environment   | Log destinations                    |
+|---------------|-------------------------------------|
+| `development` | `STDOUT` and `logs/development.log` |
+| `test`        | `logs/test.log`                     |
+| `production`  | `STDOUT`                            |
+
+NOTE: When running the Rails console in non-`production` environments,
+`STDERR` replaces `STDOUT` as a log destination.
+
+Here's how you can configure a custom logger:
 
 ```ruby
 class MyLogger < ::Logger
+  # Add support for log silencing.
   include ActiveSupport::LoggerSilence
 end
 
+# Create the custom logger instance.
 mylogger           = MyLogger.new(STDOUT)
+
+# Manually assign the log formatter, as Rails doesn't
+# automatically do this for custom loggers.
 mylogger.formatter = config.log_formatter
-config.logger      = ActiveSupport::TaggedLogging.new(mylogger)
+
+# Add support for tagged logging.
+# `ActiveSupport::TaggedLogging` is a module. The `new` method
+# clones the supplied logger and its formatter, and `extend`s modules
+# required for tagged logging on the cloned objects.
+tagged_logger      = ActiveSupport::TaggedLogging.new(mylogger)
+
+# Register the custom logger
+config.logger      = tagged_logger
 ```
 
 #### `config.middleware`
 
-Allows you to configure the application's middleware. This is covered in depth in the [Configuring Middleware](#configuring-middleware) section below.
+Allows you to configure the application's Rack middleware.
+This is covered in depth in the [Configuring Middleware](#configuring-middleware)
+section below.
 
 #### `config.precompile_filter_parameters`
 
-When `true`, will precompile [`config.filter_parameters`](#config-filter-parameters)
+When `true`, Rails will precompile [`config.filter_parameters`](#config-filter-parameters)
 using [`ActiveSupport::ParameterFilter.precompile_filters`][].
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.1                   | `true`               |
+The default value is `true`.
 
 [`ActiveSupport::ParameterFilter.precompile_filters`]: https://api.rubyonrails.org/classes/ActiveSupport/ParameterFilter.html#method-c-precompile_filters
 
@@ -788,13 +956,16 @@ The default value depends on the `config.load_defaults` target version:
 Configures whether Rails should serve static files from the public directory.
 Defaults to `true`.
 
-If the server software (e.g. NGINX or Apache) should serve static files instead,
+To serve static files using a web server or reverse proxy
+(such as Nginx or Caddy) which sits in front of your Rails application,
 set this value to `false`.
 
 #### `config.railties_order`
 
-Allows manually specifying the order that Railties/Engines are loaded. The
+Manually specify the order that railties and engines are loaded. The
 default value is `[:all]`.
+
+You can customize it as:
 
 ```ruby
 config.railties_order = [Blog::Engine, :main_app, :all]
@@ -802,56 +973,75 @@ config.railties_order = [Blog::Engine, :main_app, :all]
 
 #### `config.rake_eager_load`
 
-When `true`, eager load the application when running Rake tasks. Defaults to `false`.
+When `true`, eager load the application when running Rake
+tasks. Defaults to `false`.
 
 #### `config.relative_url_root`
 
-Can be used to tell Rails that you are [deploying to a subdirectory](
+Configures the relative root path when [deploying to a subdirectory](
 configuring.html#deploy-to-a-subdirectory-relative-url-root). The default
 is `ENV['RAILS_RELATIVE_URL_ROOT']`.
 
 #### `config.reload_classes_only_on_change`
 
-Enables or disables reloading of classes only when tracked files change. By default tracks everything on autoload paths and is set to `true`. If `config.enable_reloading` is `false`, this option is ignored.
+Controls reloading of classes only when tracked files
+change. By default, this value is `true`, and Rails tracks all
+files within the autoload paths.
+
+If `config.enable_reloading` is `false`, this option is ignored.
 
 #### `config.require_master_key`
 
-Causes the app to not boot if a master key hasn't been made available through `ENV["RAILS_MASTER_KEY"]` or the `config/master.key` file.
+When enabled, the app will not boot if a master key hasn't been made
+available through `ENV["RAILS_MASTER_KEY"]` or the `config/master.key` file.
 
 #### `config.revision`
 
-Sets the application revision for deployment tracking and error reporting. Must be a string.
-When not set, Rails first checks `ENV["REVISION"]`, then tries reading from a `REVISION` file in the application root, and if both are absent
-it attempts to get the current commit from the local git repository (default: `nil`).
+Used to set a value that uniquely identifies the current application version,
+for example a git hash. The value must be a string.
+
+When omitted, Rails first checks `ENV["REVISION"]`, then tries reading a
+`REVISION` file in the application root. If both are absent it attempts to
+get the current commit from the local git repository. Finally, if no value
+is found, the value is set to `nil`.
 
 ```ruby
 config.revision = ENV["GIT_SHA"]
 ```
 
-Revision can be accessed via `Rails.app.revision`.
+The revision can be accessed using `Rails.app.revision` and be used for
+deployment tracking or error reporting.
 
 #### `config.sandbox_by_default`
 
-When `true`, Rails console starts in sandbox mode by default, and `--no-sandbox` must be specified to start Rails console without sandbox mode. This helps prevent accidental writes to production databases. Defaults to `false`.
+When `true`, the Rails console starts in sandbox mode by default.
+The `--no-sandbox` flag must be specified to start the console
+without sandbox mode.
+
+This helps prevent accidental writes to production
+databases. Defaults to `false`.
 
 #### `config.secret_key_base`
 
 The fallback for specifying the input secret for an application's key generator.
 It is recommended to leave this unset, and instead to specify a `secret_key_base`
-in `config/credentials.yml.enc`. See the [`secret_key_base` API documentation](
+in `config/credentials.yml.enc`.
+
+See the [`secret_key_base` API documentation](
 https://api.rubyonrails.org/classes/Rails/Application.html#method-i-secret_key_base)
 for more information and alternative configuration methods.
 
 #### `config.server_timing`
 
 When `true`, adds the [`ServerTiming` middleware](#actiondispatch-servertiming)
-to the middleware stack. Defaults to `false`, but is set to `true` in the
-default generated `config/environments/development.rb` file.
+to the middleware stack. The default value is `false`, but the stock
+`config/environments/development.rb` file sets it to `true`.
 
 #### `config.session_options`
 
-Additional options passed to `config.session_store`. You should use
-`config.session_store` to set this instead of modifying it yourself.
+Additional options passed to `config.session_store`. Use this
+method to read the options only. [`config.session_store`](#config-session-store)
+should be used to assign the options along with the session store.
 
 ```ruby
 config.session_store :cookie_store, key: "_your_app_session"
@@ -860,26 +1050,36 @@ config.session_options # => {key: "_your_app_session"}
 
 #### `config.session_store`
 
-Specifies what class to use to store the session. Possible values are `:cache_store`, `:cookie_store`, `:mem_cache_store`, a custom store, or `:disabled`. `:disabled` tells Rails not to deal with sessions.
+Specifies the class used to store the session. Allowed values are
 
-This setting is configured via a regular method call, rather than a setter. This allows additional options to be passed:
+* `:cache_store`
+* `:cookie_store`
+* `:mem_cache_store`
+* a custom store
+* `:disabled`
+
+Additional options to be passed when assigning the session store:
 
 ```ruby
 config.session_store :cookie_store, key: "_your_app_session"
 ```
 
-If a custom store is specified as a symbol, it will be resolved to the `ActionDispatch::Session` namespace:
+If a custom store is specified as a symbol, it will be resolved to
+the `ActionDispatch::Session` namespace:
 
 ```ruby
 # use ActionDispatch::Session::MyCustomStore as the session store
 config.session_store :my_custom_store
 ```
 
-The default store is a cookie store with the application name as the session key.
+The default store is a cookie store with the application name as the key.
 
 #### `config.silence_healthcheck_path`
 
-Specifies the path of the health check that should be silenced in the logs. Uses `Rails::Rack::SilenceRequest` to implement the silencing. All in service of keeping health checks from clogging the production logs, especially for early-stage applications.
+Specifies the path of the health check that should be silenced in the
+logs. `Rails::Rack::SilenceRequest` implements the silencing.
+
+This prevents health check requests from clogging the production logs.
 
 ```
 config.silence_healthcheck_path = "/up"
@@ -887,59 +1087,51 @@ config.silence_healthcheck_path = "/up"
 
 #### `config.ssl_options`
 
-Configuration options for the [`ActionDispatch::SSL`](https://api.rubyonrails.org/classes/ActionDispatch/SSL.html) middleware.
+Configuration options for the [`ActionDispatch::SSL`](https://api.rubyonrails.org/classes/ActionDispatch/SSL.html)
+middleware.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `{}`                 |
-| 5.0                   | `{ hsts: { subdomains: true } }` |
+The default value is `{ hsts: { subdomains: true } }`.
 
 #### `config.time_zone`
 
-Sets the default time zone for the application and enables time zone awareness for Active Record.
+Sets the default time zone for the application and enables
+time zone awareness for Active Record.
 
 #### `config.x`
 
-Used to easily add nested custom configuration to the application config object
+Used to add custom nested configuration options to the Rails configuration object
 
-  ```ruby
-  config.x.payment_processing.schedule = :daily
-  Rails.configuration.x.payment_processing.schedule # => :daily
-  ```
+```ruby
+config.x.payment_processing.schedule = :daily
+Rails.app.config.x.payment_processing.schedule # => :daily
+```
 
 See [Custom Configuration](#custom-configuration)
 
 #### `config.yjit`
 
-Enables YJIT as of Ruby 3.3, to bring sizeable performance improvements. If you are
-deploying to a memory constrained environment you may want to set this to `false`.
-Additionally, you can pass a hash to configure YJIT options such as `{ stats: true }`.
+Enables [YJIT](https://docs.ruby-lang.org/en/master/jit/yjit_md.html) when
+running Ruby 3.3 or newer.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.2                   | `true`               |
-| 8.1                   | `!Rails.env.local?`  |
+If you are deploying to a memory constrained environment you may
+wish to set this to `false`.
+
+```ruby
+config.yjit = true              # Enable YJIT with default settings
+config.yjit = { stats: true }   # Enable YJIT with custom options
+config.yjit = false             # Disable YJIT
+```
+
+The default value is `!Rails.env.local?`.
 
 ### Configuring Assets
 
-#### `config.assets.css_compressor`
-
-Defines the CSS compressor to use. It is set by default by `sass-rails`. The unique alternative value at the moment is `:yui`, which uses the `yui-compressor` gem.
-
-#### `config.assets.js_compressor`
-
-Defines the JavaScript compressor to use. Possible values are `:terser`, `:closure`, `:uglifier`, and `:yui`, which require the use of the `terser`, `closure-compiler`, `uglifier`, or `yui-compressor` gems respectively.
-
-#### `config.assets.gzip`
-
-A flag that enables the creation of gzipped version of compiled assets, along with non-gzipped assets. Set to `true` by default.
-
 #### `config.assets.paths`
 
-Contains the paths which are used to look for assets. Appending paths to this configuration option will cause those paths to be used in the search for assets.
+TODO continue from here ...
+Contains the paths which are used to look for assets. Appending
+paths to this configuration option will cause those paths to be used
+in the search for assets.
 
 #### `config.assets.precompile`
 
