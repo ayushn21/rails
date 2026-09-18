@@ -1128,61 +1128,110 @@ The default value is `!Rails.env.local?`.
 
 #### `config.assets.paths`
 
-TODO continue from here ...
-Contains the paths which are used to look for assets. Appending
-paths to this configuration option will cause those paths to be used
-in the search for assets.
-
-#### `config.assets.precompile`
-
-Allows you to specify additional assets (other than `application.css` and `application.js`) which are to be precompiled when `bin/rails assets:precompile` is run.
-
-#### `config.assets.unknown_asset_fallback`
-
-Allows you to modify the behavior of the asset pipeline when an asset is not in the pipeline, if you use sprockets-rails 3.2.0 or newer.
-
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `true`               |
-| 5.1                   | `false`              |
+Counfigures the source paths for the [Asset Pipeline](asset_pipeline.html).
+Accepts an array of paths.
 
 #### `config.assets.prefix`
 
-Defines the prefix where assets are served from. Defaults to `/assets`.
+Defines the URL path prefix where assets are served from. Defaults
+to `/assets`.
 
-#### `config.assets.manifest`
+#### `config.assets.manifest_path`
 
-Defines the full path to be used for the asset precompiler's manifest file. Defaults to a file named `manifest-<random>.json` in the `config.assets.prefix` directory within the public folder.
+Defines the path to the [asset pipeline's manifest file](asset_pipeline.html#referencing-assets).
+Defaults to a file named `.manifest.json` in the
+[`config.assets.prefix`](#config-assets-prefix) directory within the
+public folder.
 
-#### `config.assets.digest`
+#### `config.assets.excluded_paths`
 
-Enables the use of SHA256 fingerprints in asset names. Set to `true` by default.
+Registers paths to exclude from the
+[asset pipeline's load paths](asset_pipeline.html#load-paths). Accepts
+an array of paths.
 
-#### `config.assets.debug`
+#### `config.assets.compilers`
 
-Disables the concatenation and compression of assets.
+Used to define _compilers_ to process certain types files in the asset
+pipeline. The default value is:
+
+```ruby
+[
+  ["text/css", Propshaft::Compiler::CssAssetUrls],
+  ["text/css", Propshaft::Compiler::SourceMappingUrls],
+  ["text/javascript", Propshaft::Compiler::JsAssetUrls],
+  ["text/javascript", Propshaft::Compiler::SourceMappingUrls]
+]
+```
+
+#### `config.assets.sweep_cache`
+
+When set to `true`, the cached load path is cleared before
+each request if the containing files have changed. This is used
+in the development environment  to ensure the map caches are
+reset when asset files are changed.
+
+The default value is `Rails.env.development?`.
+
+#### `config.assets.server`
+
+A boolean value that defines whether or not to include the
+`Propshaft::Server` Rack middleware in the app's
+[middleware stack](rails_on_rack.html#action-dispatch-middleware-stack).
+
+The middleware is used to serve and hot reload assets in
+development and production.
+
+The default setting is `Rails.env.development? || Rails.env.test?`.
+
+#### `config.assets.relative_url_root`
+
+Sets the URL root for asset paths when [deploying to a subdirectory](
+configuring.html#deploy-to-a-subdirectory-relative-url-root).
+
+The default value is
+[`config.relative_url_root`](#config-relative-url-root).
+
+#### `config.assets.output_path`
+
+Sets the output path where the assets are written after processing
+through the asset pipeline.
+
+The default value is `config.assets.prefix` folder located
+within the `public/` folder.
+
+#### `config.assets.file_watcher`
+
+Sets the file watcher used to monitor changes in the asset files.
+Defaults to [`config.file_watcher`](#config-file-watcher).
 
 #### `config.assets.version`
 
-Is an option string that is used in SHA256 hash generation. This can be changed to force all files to be recompiled.
+An optional string that is used in the generation of the hash used
+to stamp the asset's filename.  This can be changed to force all files
+to be recompiled.
 
-#### `config.assets.compile`
-
-Is a boolean that can be used to turn on live Sprockets compilation in production.
+The default value of "1.0" is set in `config/initializers/assets.rb`.
 
 #### `config.assets.logger`
 
-Accepts a logger conforming to the interface of Log4r or the default Ruby `Logger` class. Defaults to the same configured at `config.logger`. Setting `config.assets.logger` to `false` will turn off served assets logging.
+Registers a logger conforming to the interface of Log4r or
+the default Ruby `Logger` class.
+
+Defaults to `config.logger`.
+
+Setting `config.assets.logger` to `false` will turn off logs
+for served assets.
 
 #### `config.assets.quiet`
 
-Disables logging of assets requests. Set to `true` by default in `config/environments/development.rb`.
+Disables logging of assets requests. The default value is `false`,
+but the stock `config/environments/development.rb` file sets
+it to `true`.
 
 ### Configuring Generators
 
-Rails allows you to alter what generators are used with the `config.generators` method. This method takes a block:
+Rails allows you to alter what generators are used with the
+`config.generators` method. This method takes a block:
 
 ```ruby
 config.generators do |g|
