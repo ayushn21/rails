@@ -1230,8 +1230,8 @@ it to `true`.
 
 ### Configuring Generators
 
-Rails allows you to alter what generators are used with the
-`config.generators` method. This method takes a block:
+You can configure the behavior of Rails generators using
+`config.generators`:
 
 ```ruby
 config.generators do |g|
@@ -1240,7 +1240,9 @@ config.generators do |g|
 end
 ```
 
-The full set of methods that can be used in this block are as follows:
+The full set of methods that can be used in this block are:
+
+TODO: Maybe reformat this into a table
 
 * `force_plural` allows pluralized model names. Defaults to `false`.
 * `helper` defines whether or not to generate helpers. Defaults to `true`.
@@ -1329,130 +1331,6 @@ Rails.application.config.host_authorization = {
     [400, { "Content-Type" => "text/plain" }, ["Bad Request"]]
   end
 }
-```
-
-#### `ActionDispatch::ServerTiming`
-
-Adds the [`Server-Timing`][] header to the response, which includes performance
-metrics from the server. This data can be viewed by inspecting the response in
-the Network panel of the browser's Developer Tools. Most browsers provide a
-Timing tab that visualizes the data.
-
-[`Server-Timing`]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Server-Timing
-
-#### `ActionDispatch::SSL`
-
-Forces every request to be served using HTTPS. Enabled if `config.force_ssl` is set to `true`. Options passed to this can be configured by setting `config.ssl_options`.
-
-#### `ActionDispatch::Static`
-
-Is used to serve static assets. Disabled if `config.public_file_server.enabled` is `false`. Set `config.public_file_server.index_name` if you need to serve a static directory index file that is not named `index`. For example, to serve `main.html` instead of `index.html` for directory requests, set `config.public_file_server.index_name` to `"main"`.
-
-#### `ActionDispatch::Executor`
-
-Allows thread safe code reloading. Disabled if `config.allow_concurrency` is `false`, which causes `Rack::Lock` to be loaded. `Rack::Lock` wraps the app in mutex so it can only be called by a single thread at a time.
-
-#### `ActiveSupport::Cache::Strategy::LocalCache`
-
-Serves as a basic memory backed cache. This cache is not thread safe and is intended only for serving as a temporary memory cache for a single thread.
-
-#### `Rack::Runtime`
-
-Sets an `X-Runtime` header, containing the time (in seconds) taken to execute the request.
-
-#### `Rails::Rack::Logger`
-
-Notifies the logs that the request has begun. After request is complete, flushes all the logs.
-
-#### `ActionDispatch::ShowExceptions`
-
-Rescues any exception returned by the application and renders nice exception pages if the request is local or if `config.consider_all_requests_local` is set to `true`. If `config.action_dispatch.show_exceptions` is set to `:none`, exceptions will be raised regardless.
-
-#### `ActionDispatch::RequestId`
-
-Makes a unique X-Request-Id header available to the response and enables the `ActionDispatch::Request#uuid` method. Configurable with `config.action_dispatch.request_id_header`.
-
-#### `ActionDispatch::RemoteIp`
-
-Checks for IP spoofing attacks and gets valid `client_ip` from request headers. Configurable with the `config.action_dispatch.ip_spoofing_check`, and `config.action_dispatch.trusted_proxies` options.
-
-#### `Rack::Sendfile`
-
-Intercepts responses whose body is being served from a file and replaces it with a server specific X-Sendfile header. Configurable with `config.action_dispatch.x_sendfile_header`.
-
-#### `ActionDispatch::Callbacks`
-
-Runs the prepare callbacks before serving the request.
-
-#### `ActionDispatch::Cookies`
-
-Sets cookies for the request.
-
-#### `ActionDispatch::Session::CookieStore`
-
-Is responsible for storing the session in cookies. An alternate middleware can be used for this by changing [`config.session_store`](#config-session-store).
-
-#### `ActionDispatch::Flash`
-
-Sets up the `flash` keys. Only available if [`config.session_store`](#config-session-store) is set to a value.
-
-#### `Rack::MethodOverride`
-
-Allows the method to be overridden if `params[:_method]` is set. This is the middleware which supports the PATCH, PUT, and DELETE HTTP method types.
-
-#### `Rack::Head`
-
-Returns an empty body for all HEAD requests. It leaves all other requests unchanged.
-
-#### Adding Custom Middleware
-
-Besides these usual middleware, you can add your own by using the `config.middleware.use` method:
-
-```ruby
-config.middleware.use Magical::Unicorns
-```
-
-This will put the `Magical::Unicorns` middleware on the end of the stack. You can use `insert_before` if you wish to add a middleware before another.
-
-```ruby
-config.middleware.insert_before Rack::Head, Magical::Unicorns
-```
-
-Or you can insert a middleware to exact position by using indexes. For example, if you want to insert `Magical::Unicorns` middleware on top of the stack, you can do it, like so:
-
-```ruby
-config.middleware.insert_before 0, Magical::Unicorns
-```
-
-There's also `insert_after` which will insert a middleware after another:
-
-```ruby
-config.middleware.insert_after Rack::Head, Magical::Unicorns
-```
-
-Middlewares can also be completely swapped out and replaced with others:
-
-```ruby
-config.middleware.swap ActionController::Failsafe, Lifo::Failsafe
-```
-
-Middlewares can be moved from one place to another:
-
-```ruby
-config.middleware.move_before ActionDispatch::Flash, Magical::Unicorns
-```
-
-This will move the `Magical::Unicorns` middleware before
-`ActionDispatch::Flash`. You can also move it after:
-
-```ruby
-config.middleware.move_after ActionDispatch::Flash, Magical::Unicorns
-```
-
-They can also be removed from the stack completely:
-
-```ruby
-config.middleware.delete Rack::MethodOverride
 ```
 
 ### Configuring i18n

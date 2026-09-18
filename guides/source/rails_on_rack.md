@@ -349,9 +349,14 @@ Much of Action Controller's functionality is implemented as middleware. The foll
 
 #### `ActionDispatch::RemoteIp`
 
-[`ActionDispatch::RemoteIp`][] checks for IP spoofing attacks.
+[`ActionDispatch::RemoteIp`][] checks for IP spoofing attacks and gets a valid
+`client_ip` from request headers. Configurable with the
+[`config.action_dispatch.ip_spoofing_check`][], and [`config.action_dispatch.trusted_proxies`][]
+options.
 
 [`ActionDispatch::RemoteIp`]: https://api.rubyonrails.org/classes/ActionDispatch/RemoteIp.html
+[`config.action_dispatch.ip_spoofing_check`]: configuring.html#config-action-dispatch-ip-spoofing-check
+[`config.action_dispatch.trusted_proxies`]: configuring.html#config-action-dispatch-trusted-proxies
 
 #### `ActionDispatch::RequestId`
 
@@ -378,6 +383,18 @@ The unique request id can be used to trace a request end-to-end and would typica
 [`ActionDispatch::ShowExceptions`][] rescues any exception returned by the application and calls an exceptions app that will wrap it in a format for the end user.
 
 [`ActionDispatch::ShowExceptions`]: https://api.rubyonrails.org/classes/ActionDispatch/ShowExceptions.html
+
+#### `ActionDispatch::SSL`
+
+Included in the stack when [`config.force_ssl`](configuring.html#config-force-ssl)
+is set to `true`.
+
+It sets the [HSTS HTTP header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security)
+for all HTTP responses which tells the client to communicate with
+the host over HTTPS only.
+
+Options passed to this middle can be configured by setting
+[`config.ssl_options`](configuring.html#config-ssl-options).
 
 #### `ActionDispatch::Static`
 
@@ -444,7 +461,7 @@ The unique request id can be used to trace a request end-to-end and would typica
 
 #### `Rack::Sendfile`
 
-[`Rack::Sendfile`] sets a server specific `X-Sendfile` header. This is useful for accelerated file sending if you use a reverse proxy server like Apache or Nginx. For example it can be set to 'X-Sendfile' for Apache. Configure this via [`config.action_dispatch.x_sendfile_header`][] option.
+[`Rack::Sendfile`] sets a server specific `X-Sendfile` header. This is useful for accelerated file sending if you use a reverse proxy server like Apache or Nginx. For example it can be set to 'X-Sendfile' for Apache. Configure this using [`config.action_dispatch.x_sendfile_header`][].
 
 [`Rack::Sendfile`]: https://rack.github.io/rack/3.2/Rack/Sendfile.html
 [`config.action_dispatch.x_sendfile_header`]: configuring.html#config-action-dispatch-x-sendfile-header
