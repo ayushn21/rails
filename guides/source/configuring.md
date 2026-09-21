@@ -1335,51 +1335,70 @@ Rails.application.config.host_authorization = {
 
 ### Configuring i18n
 
-All these configuration options are delegated to the `I18n` library.
+All these configuration options are delegated to the `I18n` library. See
+the [Internationalization guide](i18n.html) for more details.
 
 #### `config.i18n.available_locales`
 
-Defines the permitted available locales for the app. Defaults to all locale keys found in locale files, usually only `:en` on a new application.
+Defines the permitted available locales for the app. Defaults to
+all locale keys found in locale files, usually only `:en` on a
+new application.
 
 #### `config.i18n.default_locale`
 
-Sets the default locale of an application used for i18n. Defaults to `:en`.
+Sets the default locale of an application used for i18n.
+Defaults to `:en`.
 
 #### `config.i18n.enforce_available_locales`
 
-Ensures that all locales passed through i18n must be declared in the `available_locales` list, raising an `I18n::InvalidLocale` exception when setting an unavailable locale. Defaults to `true`. It is recommended not to disable this option unless strongly required, since this works as a security measure against setting any invalid locale from user input.
+When `true`, an `I18n::InvalidLocale` error is raised when a locale
+that isn't declared in the `available_locales` list is encountered.
+Defaults to `true`.
+
+It is recommended to keep this option enabled as it is a security measure
+preventing malicious users from setting an invalid locale via user input.
 
 #### `config.i18n.load_path`
 
-Sets the path Rails uses to look for locale files. Defaults to `config/locales/**/*.{yml,rb}`.
+Sets the path to the files containing localized strings.
+Defaults to `config/locales/**/*.{yml,rb}`.
 
 #### `config.i18n.raise_on_missing_translations`
 
-Determines whether an error should be raised for missing translations. If `true`, views and controllers raise `I18n::MissingTranslationData`. If `:strict`, models also raise the error. This defaults to `false`.
+Determines whether an error should be raised when localized text for a
+key is missing.
+
+If `true`, views and controllers raise `I18n::MissingTranslationData`.
+If `:strict`, models will also raise the error.
+
+The default setting is `false`.
 
 #### `config.i18n.fallbacks`
 
-Sets fallback behavior for missing translations. Here are 3 usage examples for this option:
+Sets fallback behavior for missing translations.
 
-  * You can set the option to `true` for using default locale as fallback, like so:
+Setting this option to `true` will fallback to the default locale:
 
-    ```ruby
-    config.i18n.fallbacks = true
-    ```
+```ruby
+config.i18n.fallbacks = true
+```
 
-  * Or you can set an array of locales as fallback, like so:
+You can also supply an array of locales to use a fallback options:
 
-    ```ruby
-    config.i18n.fallbacks = [:tr, :en]
-    ```
+```ruby
+config.i18n.fallbacks = [:tr, :en]
+```
 
-  * Or you can set different fallbacks for locales individually. For example, if you want to use `:tr` for `:az` and `:de`, `:en` for `:da` as fallbacks, you can do it, like so:
+Or different fallbacks can be set for specific locales.
 
-    ```ruby
-    config.i18n.fallbacks = { az: :tr, da: [:de, :en] }
-    #or
-    config.i18n.fallbacks.map = { az: :tr, da: [:de, :en] }
-    ```
+For example, the below example demonstrates how to use `:tr` as a
+fallback for `:az` and  both `:de` and `:en` as fallbacks for `:da`:
+
+```ruby
+config.i18n.fallbacks = { az: :tr, da: [:de, :en] }
+# or
+config.i18n.fallbacks.map = { az: :tr, da: [:de, :en] }
+```
 
 ### Configuring Active Model
 
