@@ -1404,9 +1404,17 @@ config.i18n.fallbacks.map = { az: :tr, da: [:de, :en] }
 
 #### `config.active_model.i18n_customize_full_message`
 
-Controls whether the [`Error#full_message`][ActiveModel::Error#full_message] format can be overridden in an i18n locale file. Defaults to `false`.
+Controls whether the [`Error#full_message`][ActiveModel::Error#full_message]
+format can be overridden in an i18n locale file. Defaults to `false`.
 
-When set to `true`, `full_message` will look for a format at the attribute and model level of the locale files. The default format is `"%{attribute} %{message}"`, where `attribute` is the name of the attribute, and `message` is the validation-specific message. The following example overrides the format for all `Person` attributes, as well as the format for a specific `Person` attribute (`age`).
+When set to `true`, `full_message` will look for a format at the attribute
+and model level of the locale files.
+
+The default format is `"%{attribute_name} %{error_message}"`.
+
+The following example demonstrates how to override the format for
+all `Person` attributes, and set a specific format for the `age`
+attribute.
 
 ```ruby
 class Person
@@ -1453,71 +1461,123 @@ irb> person.errors.messages
 
 ### Configuring Active Record
 
-`config.active_record` includes a variety of configuration options:
-
 #### `config.active_record.logger`
 
-Accepts a logger conforming to the interface of Log4r or the default Ruby Logger class, which is then passed on to any new database connections made. You can retrieve this logger by calling `logger` on either an Active Record model class or an Active Record model instance. Set to `nil` to disable logging.
+Accepts a logger conforming to the interface of `Log4r` or the default
+Ruby Logger class, which is then passed on to any new database connections
+made.
+
+Retrieve this logger by calling `logger` on either an Active Record model
+class or an Active Record model instance.
+
+Set it to `nil` to disable logging.
 
 #### `config.active_record.primary_key_prefix_type`
 
-Lets you adjust the naming for primary key columns. By default, Rails assumes that primary key columns are named `id` (and this configuration option doesn't need to be set). There are two other choices:
+Configures the name for the primary key columns in your database.
 
-* `:table_name` would make the primary key for the Customer class `customerid`.
-* `:table_name_with_underscore` would make the primary key for the Customer class `customer_id`.
+By default, Rails names the primary key column `id`. Alternatively, you can
+assign one of the two below values to this configuration option:
+
+* `:table_name`: A `Customer` class will look for `customerid` as the primary
+key column.
+
+* `:table_name_with_underscore`: A `Customer` class will look for `customer_id`
+as the primary key column.
 
 #### `config.active_record.table_name_prefix`
 
-Lets you set a global string to be prepended to table names. If you set this to `northwest_`, then the Customer class will look for `northwest_customers` as its table. The default is an empty string.
+Sets a global string to prepend to all table names.
+
+For example, setting this to `northwest_` means that a `Customer` model
+will be backed by a table named `northwest_customers`.
+
+The default is an empty string.
 
 #### `config.active_record.table_name_suffix`
 
-Lets you set a global string to be appended to table names. If you set this to `_northwest`, then the Customer class will look for `customers_northwest` as its table. The default is an empty string.
+Sets a global string to append to all table names.
+
+For example, setting this to `_northwest` means that a `Customer` model
+will be backed by a table named `customers_northwest`.
+
+The default is an empty string.
 
 #### `config.active_record.schema_migrations_table_name`
 
-Lets you set a string to be used as the name of the schema migrations table.
+Sets the name of the schema migrations table.
 
 #### `config.active_record.internal_metadata_table_name`
 
-Lets you set a string to be used as the name of the internal metadata table.
+Sets the name of the internal metadata table.
 
 #### `config.active_record.protected_environments`
 
-Lets you set an array of names of environments where destructive actions should be prohibited.
+Define an array containing the names of environments
+where destructive actions should be prohibited.
 
 #### `config.active_record.pluralize_table_names`
 
-Specifies whether Rails will look for singular or plural table names in the database. If set to `true` (the default), then the Customer class will use the `customers` table. If set to `false`, then the Customer class will use the `customer` table.
+Specifies the naming convention for the tables that back Active Record models.
+
+The default is `true`, which means that a `Customer` model will be backed by
+the `customers` table.
+
+When set to `false`, a `Customer` class will be backed by a table
+named `customer`.
 
 WARNING: Some Rails generators and installers (notably `active_storage:install`
-and `action_text:install`) create tables with plural names regardless of this
+and `action_text:install`) create tables with pluralized names regardless of this
 setting. If you set `pluralize_table_names` to `false`, you will need to
 manually rename those tables after installation to maintain consistency.
-This limitation exists because these installers use fixed table names
-in their migrations for compatibility reasons.
+These installers use fixed table names in their migrations for
+compatibility reasons.
 
 #### `config.active_record.default_timezone`
 
-Determines whether to use `Time.local` (if set to `:local`) or `Time.utc` (if set to `:utc`) when pulling dates and times from the database. The default is `:utc`.
+Sets the default timezone when reading dates and times from the database.
+The default is `:utc`.
+
+Alternatively, you can set it to `:local`, which will use `Time.local` instead.
 
 #### `config.active_record.schema_format`
 
-Controls the format for dumping the database schema to a file. The options are `:ruby` (the default) for a database-independent version that depends on migrations, or `:sql` for a set of (potentially database-dependent) SQL statements. This can be overridden per-database by setting `schema_format` in your database configuration.
+Defines the format for the file representing the database schema. Valid
+options are `:ruby` (the default), or `:sql`.
+
+`:ruby` defines the schema using a Rails DSL similar to database migrations. It
+is database agnostic.
+
+`:sql` dumps the schema to a set of SQL statements. These may potentially be
+database-dependent.
+
+This can be overridden for specific databases by setting `schema_format` in
+the database configuration.
 
 #### `config.active_record.error_on_ignored_order`
 
-Specifies if an error should be raised if the order of a query is ignored during a batch query. The options are `true` (raise error) or `false` (warn). Default is `false`.
+Specifies whether an error should be raised if the order of a query is ignored
+during a batch query.
+
+The options are `true` (raise error) or `false` (warn). Default is `false`.
 
 #### `config.active_record.timestamped_migrations`
 
-Controls whether migrations are numbered with serial integers or with timestamps. The default is `true`, to use timestamps, which are preferred if there are multiple developers working on the same application.
+Controls whether migrations are serialized with timestamps (`true`) or with serial
+integers (`false`).
+
+The default is `true`, which is recommended to prevent conflicts when there
+are multiple developers working on the same application.
 
 #### `config.active_record.automatically_invert_plural_associations`
 
-Controls whether Active Record will automatically look for inverse relations with a pluralized name.
+Controls whether Active Record will automatically look for inverse
+relations with a pluralized name. This is used to infer
+[bi-directional associations](association_basics.html#bi-directional-associations)
 
-Example:
+The default value is `false`.
+
+Consider the below example:
 
 ```ruby
 class Post < ApplicationRecord
@@ -1529,15 +1589,21 @@ class Comment < ApplicationRecord
 end
 ```
 
-In the above case Active Record used to only look for a `:comment` (singular) association in `Post`, and won't find it.
+When `automatically_invert_plural_associations` is `false`, Active Record
+will not automatically infer `:comments` as the inverse association of
+`belongs_to :post`. It would expect the inverse association to be the
+singular `:comment`.
 
-With this option enabled, it will also look for a `:comments` association. In the vast majority of cases
-having the inverse association discovered is beneficial as it can prevent some useless queries, but
-it may cause backward compatibility issues with legacy code that doesn't expect it.
+In the opposite case, when `automatically_invert_plural_associations` is `true`,
+`:comments` will be inferred as the inverse association of `belongs_to :post`.
 
-This behavior can be disabled on a per-model basis:
+In most cases, inferring the inverse associations (by setting this option to `true`)
+is beneficial as it prevents internal inconsistencies and optimizes SQL queries. There may,
+however be some compatibility issues with legacy code.
 
-```ruby
+The global setting for this option may be overridden in specific models:
+
+```ruby#2
 class Comment < ApplicationRecord
   self.automatically_invert_plural_associations = false
 
@@ -1545,33 +1611,20 @@ class Comment < ApplicationRecord
 end
 ```
 
-And on a per-association basis:
-
-```ruby
-class Comment < ApplicationRecord
-  self.automatically_invert_plural_associations = true
-
-  belongs_to :post, inverse_of: nil
-end
-```
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-
 #### `config.active_record.validate_migration_timestamps`
 
-Controls whether to validate migration timestamps. When set, an error will be raised if the
-timestamp prefix for a migration is more than a day ahead of the timestamp associated with the
-current time. This is done to prevent forward-dating of migration files, which can impact migration
-generation and other migration commands. `config.active_record.timestamped_migrations` must be set to `true`.
+A boolean value controlling the validation of timestamps in database
+migration files.
 
-The default value depends on the `config.load_defaults` target version:
+When enabled, an error will be raised if the timestamp prefix for a migration
+is more than a day ahead of the current time. The default value is `true`.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.2                   | `true`               |
+This prevents forward-dating of migration files, which can impact migration
+generation and other migration commands.
+
+This option requires that
+[`config.active_record.timestamped_migrations`](#config-active-record-timestamped-migrations)
+is set to `true`.
 
 #### `config.active_record.db_warnings_action`
 
