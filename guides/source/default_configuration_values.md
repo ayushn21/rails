@@ -1,4 +1,18 @@
-### Versioned Default Values
+**DO NOT READ THIS FILE ON GITHUB, GUIDES ARE PUBLISHED ON <https://guides.rubyonrails.org>.**
+
+Versioned Default Values
+========================
+
+This guide covers how to set up an environment for Ruby on Rails core development.
+
+After reading this guide, you will know:
+
+* How to set up your machine for Rails development
+
+--------------------------------------------------------------------------------
+
+Versioned Default Values
+------------------------
 
 [`config.load_defaults`] loads default configuration values for a target version and all versions prior. For example, `config.load_defaults 6.1` will load defaults for all versions up to and including version 6.1.
 

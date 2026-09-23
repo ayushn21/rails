@@ -1628,50 +1628,60 @@ is set to `true`.
 
 #### `config.active_record.db_warnings_action`
 
-Controls the action to be taken when an SQL query produces a warning. The following options are available:
+Controls the action to be taken when an SQL query produces a warning.
+The available options are:
 
-  * `:ignore` - Database warnings will be ignored. This is the default.
+| Value               | Behavior                              |
+|---------------------|---------------------------------------|
+| `:ignore` (default) | Database warnings will be ignored.    |
+| `:log`              | Database warnings will be logged using `ActiveRecord.logger` at the `:warn` level |
+| `:raise`            | Database warnings will be raised as `ActiveRecord::SQLWarning`. |
+| `:report`           | Database warnings will be reported to subscribers of Rails' error reporter. |
 
-  * `:log` - Database warnings will be logged via `ActiveRecord.logger` at the `:warn` level.
+Alternatively, you can supply a custom proc which accepts a `SQLWarning`
+error object:
 
-  * `:raise` - Database warnings will be raised as `ActiveRecord::SQLWarning`.
-
-  * `:report` - Database warnings will be reported to subscribers of Rails' error reporter.
-
-  * Custom proc - A custom proc can be provided. It should accept a `SQLWarning` error object.
-
-    For example:
-
-    ```ruby
-    config.active_record.db_warnings_action = ->(warning) do
-      # Report to custom exception reporting service
-      Bugsnag.notify(warning.message) do |notification|
-        notification.add_metadata(:warning_code, warning.code)
-        notification.add_metadata(:warning_level, warning.level)
-      end
-    end
-    ```
+```ruby
+config.active_record.db_warnings_action = ->(warning) do
+  # Report to custom exception reporting service
+  Bugsnag.notify(warning.message) do |notification|
+    notification.add_metadata(:warning_code, warning.code)
+    notification.add_metadata(:warning_level, warning.level)
+  end
+end
+```
 
 #### `config.active_record.db_warnings_ignore`
 
-Specifies an allowlist of warning codes and messages that will be ignored, regardless of the configured `db_warnings_action`.
-The default behavior is to report all warnings. Warnings to ignore can be specified as Strings or Regexps. For example:
+Specifies a list of warning codes and messages that will be
+ignored regardless of the configured `db_warnings_action`. All warnings
+will be reported by default.
 
-  ```ruby
-  config.active_record.db_warnings_action = :raise
-  # The following warnings will not be raised
-  config.active_record.db_warnings_ignore = [
-    /Invalid utf8mb4 character string/,
-    "An exact warning message",
-    "1062", # MySQL Error 1062: Duplicate entry
-  ]
-  ```
+The list of warnings to suppress can be defined using Strings or
+Regular Expressions:
+
+```ruby
+config.active_record.db_warnings_action = :raise
+# The following warnings will not be raised
+config.active_record.db_warnings_ignore = [
+  /Invalid utf8mb4 character string/,
+  "An exact warning message",
+  "1062", # MySQL Error 1062: Duplicate entry
+]
+```
 
 #### `config.active_record.migration_strategy`
 
-Controls the strategy class used to perform schema statement methods in a migration. The default class
-delegates to the connection adapter. Custom strategies should inherit from `ActiveRecord::Migration::ExecutionStrategy`,
-or may inherit from `DefaultStrategy`, which will preserve the default behavior for methods that aren't implemented:
+Use this option to customize the strategy class used
+to execute database modifications in a migration.
+
+The default class (`ActiveRecord::Migration::DefaultStrategy`)
+delegates all method calls to the connection adapter.
+
+Custom strategies must inherit from
+`ActiveRecord::Migration::ExecutionStrategy`. Alternatively, you may
+subclass `ActiveRecord::Migration::DefaultStrategy` to preserve the
+default behavior for methods that aren't implemented:
 
 ```ruby
 class CustomMigrationStrategy < ActiveRecord::Migration::DefaultStrategy
@@ -1683,10 +1693,13 @@ end
 config.active_record.migration_strategy = CustomMigrationStrategy
 ```
 
-You can also configure migration strategies on a per-adapter basis by setting the `migration_strategy` class on the adapter itself.
-This is useful when you want to customize migration behavior for a specific database type.
+You can also configure migration strategies for specific adapters
+by setting the `migration_strategy` class on the adapter itself.
 
-For example, to use a custom migration strategy for PostgreSQL:
+This is useful when you want to customize migration behavior for a
+specific database type.
+
+For example, to use a custom migration strategy for PostgreSQL only:
 
 ```ruby
 class CustomPostgresStrategy < ActiveRecord::Migration::DefaultStrategy
@@ -1698,12 +1711,18 @@ end
 ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.migration_strategy = CustomPostgresStrategy
 ```
 
-By assigning to the adapter class, all migrations run through connections using that adapter will use the specified strategy.
-
 #### `config.active_record.schema_versions_formatter`
 
-Controls the formatter class used by schema dumper to format versions information. Custom class can be provided
-to change the default behavior:
+Used to customize the formatter class used by the schema dumper to
+format or order schema versions. This option is only relevant when your
+[`config.active_record.schema_format`](#config-active-record-schema-format)
+is `:sql`.
+
+You may wish to customize the order of the versions in the SQL statement
+to prevent merge conflicts when a large number of people are working on the
+same project.
+
+Create a custom formatter to accomplish this:
 
 ```ruby
 class CustomSchemaVersionsFormatter
@@ -1712,7 +1731,7 @@ class CustomSchemaVersionsFormatter
   end
 
   def format(versions)
-    # Special sorting of versions to reduce the likelihood of conflicts.
+    # Special sorting of versions to reduce the likelihood of merge conflicts.
     sorted_versions = versions.sort { |a, b| b.to_s.reverse <=> a.to_s.reverse }
 
     sql = +"INSERT INTO schema_migrations (version) VALUES\n"
@@ -1725,17 +1744,30 @@ end
 config.active_record.schema_versions_formatter = CustomSchemaVersionsFormatter
 ```
 
+WARNING: Do not use this class to transform or modify the version
+strings in any way. Doing that would create an inconsistency between
+the version strings in every database migration file, and the contents
+of the schema versions table.
+
 #### `config.active_record.lock_optimistically`
 
-Controls whether Active Record will use optimistic locking and is `true` by default.
+Controls whether Active Record uses optimistic locking. It's
+set to `true` by default.
 
 #### `config.active_record.cache_timestamp_format`
 
-Controls the format of the timestamp value in the cache key. Default is `:usec`.
+Defines the format of the timestamp value in the cache
+key. Accepts any of the symbols in `Time::DATE_FORMATS`.
+
+Default is `:usec`.
 
 #### `config.active_record.record_timestamps`
 
-Is a boolean value which controls whether or not timestamping of `create` and `update` operations on a model occur. The default value is `true`.
+# TODO continue ...
+A boolean value which controls whether or not timestamping of
+`create` and `update` operations on a model occur.
+
+The default value is `true`.
 
 #### `config.active_record.partial_inserts`
 
