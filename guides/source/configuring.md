@@ -2727,15 +2727,23 @@ or development environments.
 
 ### Configuring Action Controller
 
-`config.action_controller` includes a number of configuration settings:
-
 #### `config.action_controller.asset_host`
 
-Sets the host for the assets. Useful when CDNs are used for hosting assets rather than the application server itself. You should only use this if you have a different configuration for Action Mailer, otherwise use `config.asset_host`.
+Sets the host used to serve assets.
+
+Configure this option when a CDN is used to deliver assets rather than
+the application server itself.
+
+WARNING: Only use this option if Action Mailer uses a different host
+for assets, otherwise use [`config.asset_host`](#config-asset-host).
 
 #### `config.action_controller.perform_caching`
 
-Configures whether the application should perform the caching features provided by the Action Controller component. Set to `false` in the development environment, `true` in production. If it's not specified, the default will be `true`.
+Configures whether the [caching features of Action Controller](caching_with_rails.html)
+should be enabled.
+
+The default value is `true`, but it's set to `false` in the
+stock `config/environments/development.rb` file.
 
 #### `config.action_controller.default_static_extension`
 
@@ -2743,115 +2751,131 @@ Configures the extension used for cached pages. Defaults to `.html`.
 
 #### `config.action_controller.include_all_helpers`
 
-Configures whether all view helpers are available everywhere or are scoped to the corresponding controller. If set to `false`, `UsersHelper` methods are only available for views rendered as part of `UsersController`. If `true`, `UsersHelper` methods are available everywhere. The default configuration behavior (when this option is not explicitly set to `true` or `false`) is that all view helpers are available to each controller.
+Configures whether all view helpers are available across all templates.
+
+When disabled, helpers are scoped to the views for their associated
+controller. For example, methods in a `UsersHelper` would only be available
+in views rendered in the `UsersController`.
+
+The default setting is `nil`, which has the same behavior as `true` — meaning
+that all helpers are available across all views in the application.
 
 #### `config.action_controller.logger`
 
-Accepts a logger conforming to the interface of Log4r or the default Ruby Logger class, which is then used to log information from Action Controller. Set to `nil` to disable logging.
+Accepts a logger conforming to the interface of `Log4r` or the default
+Ruby Logger class, which is then used to log information from Action
+Controller.
+
+Set to `nil` to disable logging.
 
 #### `config.action_controller.request_forgery_protection_token`
 
-Sets the token parameter name for RequestForgery. Calling `protect_from_forgery` sets it to `:authenticity_token` by default.
+Sets the token parameter name for
+[`RequestForgeryProtection`](https://api.rubyonrails.org/classes/ActionController/RequestForgeryProtection.html).
+
+The default value is `:authenticity_token`.
 
 #### `config.action_controller.allow_forgery_protection`
 
-Enables or disables CSRF protection. By default this is `false` in the test environment and `true` in all other environments.
+A boolean determining whether CSRF protection is enabled.
+
+By default, this is `false` in the test environment and `true` in all other environments.
 
 #### `config.action_controller.forgery_protection_origin_check`
 
-Configures whether the HTTP `Origin` header should be checked against the site's origin as an additional CSRF defense.
+Configures whether the HTTP `Origin` header should be checked
+against the site's origin as an additional CSRF defense.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 5.0                   | `true`               |
+The default value is `true`.
 
 #### `config.action_controller.per_form_csrf_tokens`
 
-Configures whether CSRF tokens are only valid for the method/action they were generated for.
+Configures whether CSRF tokens are only valid for the method or action
+they were generated for.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 5.0                   | `true`               |
+The default value is `true`.
 
 #### `config.action_controller.forgery_protection_verification_strategy`
 
-Configures how Rails verifies requests for CSRF protection. Available strategies are:
+Sets the verification strategy for CSRF protection. Available strategies are:
 
-* `:header_only` - Uses the `Sec-Fetch-Site` header sent by modern browsers to verify
-  that requests originate from the same site. Requests without a valid header are rejected.
-  This is simpler and more secure but only works with browsers that support the
-  [Fetch Metadata Request Headers](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Sec-Fetch-Site).
+* `:header_only`: Uses the `Sec-Fetch-Site` header sent by modern browsers
+  to verify that requests originate from the same site. Requests without a
+  valid header are rejected.
 
-* `:header_or_legacy_token` - A hybrid approach that checks the `Sec-Fetch-Site` header first.
-  If the header indicates same-origin or same-site, the request is allowed. When the
-  header is missing or has the value "none", it falls back to checking the authenticity
-  token. This supports older browsers while logging when fallback occurs.
+* `:header_or_legacy_token` - A hybrid approach that checks the
+  `Sec-Fetch-Site` header first. If the header indicates
+  `same-origin` or `same-site`, the request is allowed. When the
+  header is missing or has the value "none", it falls back to checking the authenticity token. This supports older browsers while logging when
+  fallback occurs.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is         |
-| --------------------- | ---------------------------- |
-| (original)            | `:header_or_legacy_token`    |
-| 8.2                   | `:header_only`               |
+The default value is `:header_only`.
 
 #### `config.action_controller.default_protect_from_forgery`
 
-Determines whether forgery protection is added on `ActionController::Base`.
+Determines whether forgery protection is automatically enabled
+on `ActionController::Base`.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 5.2                   | `true`               |
+The default value is `true`.
 
 #### `config.action_controller.default_protect_from_forgery_with`
 
-Configures the default strategy used when calling `protect_from_forgery` without the `:with` option.
-Defaults to `:null_session`, but will change to `:exception` in a future version of Rails.
+Configures the default strategy used when calling
+`protect_from_forgery` without the `:with` option.
 
-Applications can opt into the new behavior early by setting:
+Defaults to `:null_session`, but will change to `:exception`
+in a future version of Rails.
 
-```ruby
-config.action_controller.default_protect_from_forgery_with = :exception
-```
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:null_session`      |
-| 8.2                   | `:exception`         |
+The default value is `:exception`.
 
 #### `config.action_controller.relative_url_root`
 
-Can be used to tell Rails that you are [deploying to a subdirectory](
-configuring.html#deploy-to-a-subdirectory-relative-url-root). The default is
-[`config.relative_url_root`](#config-relative-url-root).
+Set this value when deploying your Rails app to [a subdirectory](
+configuring.html#deploy-to-a-subdirectory-relative-url-root).
+
+The default is [`config.relative_url_root`](#config-relative-url-root).
 
 #### `config.action_controller.permit_all_parameters`
 
-Sets all the parameters for mass assignment to be permitted by default. The default value is `false`.
+When `true, all the parameters for mass assignment will be permitted.
+
+The default value is `false`.
 
 #### `config.action_controller.action_on_unpermitted_parameters`
 
-Controls behavior when parameters that are not explicitly permitted are found. The default value is `:log` in test and development environments, `false` otherwise. The values can be:
+Defines the behavior when the controller receives parameters which
+have not been explicitly permitted.
 
-* `false` to take no action
-* `:log` to emit an `ActiveSupport::Notifications.instrument` event on the `unpermitted_parameters.action_controller` topic and log at the DEBUG level
-* `:raise` to raise a `ActionController::UnpermittedParameters` exception
+The accepted values are:
+* `false`: No action is taken.
+* `:log`: Emits an `ActiveSupport::Notifications.instrument` event on
+  the ` unpermitted_parameters.action_controller` topic and writes a log
+  at the DEBUG level.
+* `:raise`: Raises an `ActionController::UnpermittedParameters` exception.
+
+The default value is `nil` — which means this option will be set to
+`:log` in `test` and `development` environments, and `false` in any other
+environment.
 
 #### `config.action_controller.always_permitted_parameters`
 
-Sets a list of permitted parameters that are permitted by default. The default values are `['controller', 'action']`.
+Registers an array of parameters that are permitted by default.
+
+The default value is `['controller', 'action']`.
 
 #### `config.action_controller.enable_fragment_cache_logging`
 
-Determines whether to log fragment cache reads and writes in verbose format as follows:
+A boolean flag controlling the verbosity of log lines for fragment cache
+reads and writes.
+
+The default value is `false`, resulting in logs similar to:
+
+```
+Rendered messages/_message.html.erb in 1.2 ms [cache hit]
+Rendered recordings/threads/_thread.html.erb in 1.5 ms [cache miss]
+```
+
+Alternatively, setting this to `true` will log more detailed information:
 
 ```
 Read fragment views/v1/2914079/v1/2914079/recordings/70182313-20160225015037000000/d0bdf2974e1ef6d31685c3b392ad0b74 (0.6ms)
@@ -2860,140 +2884,126 @@ Write fragment views/v1/2914079/v1/2914079/recordings/70182313-20160225015037000
 Rendered recordings/threads/_thread.html.erb in 1.5 ms [cache miss]
 ```
 
-By default it is set to `false` which results in following output:
-
-```
-Rendered messages/_message.html.erb in 1.2 ms [cache hit]
-Rendered recordings/threads/_thread.html.erb in 1.5 ms [cache miss]
-```
-
 #### `config.action_controller.raise_on_missing_callback_actions`
 
-Raises an `AbstractController::ActionNotFound` when the action specified in callback's `:only` or `:except` options is missing in the controller.
+Raises an `AbstractController::ActionNotFound` when the action
+specified in a callback's `:only` or `:except` options is missing in
+the controller.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.1                   | `true` (development and test), `false` (other envs)|
-
+The default value is `true` in `development` and `test` environment,
+and `false` in other environments.
 
 #### `config.action_controller.raise_on_open_redirects`
 
-Protect an application from unintentionally redirecting to an external host
-(also known as an "open redirect") by making external redirects opt-in.
+This option prevents an application from unintentionally
+redirecting to an external host (also known as an "open redirect").
 
 When this configuration is set to `true`, an
 `ActionController::Redirecting::UnsafeRedirectError` will be raised when a URL
 with an external host is passed to [redirect_to][]. If an open redirect should
-be allowed, then `allow_other_host: true` can be added to the call to
-`redirect_to`.
+be allowed, then `allow_other_host: true` needs to be added to the method call.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
+The default value is `false`.
+
+WARNING: This option is deprecated and will be removed in a future Rails
+version. Use
+[`config.action_controller.action_on_open_redirect`](#config-action-controller-action-on-open-redirect)
+instead.
 
 [redirect_to]: https://api.rubyonrails.org/classes/ActionController/Redirecting.html#method-i-redirect_to
 
 #### `config.action_controller.action_on_open_redirect`
 
-Controls how Rails handles open redirect attempts (redirects to external hosts).
+Defines the behavior when the application redirects to an external host
+(also known as an open redirect). The available values are:
 
-**Note:** This configuration replaces the deprecated [`config.action_controller.raise_on_open_redirects`](#config-action-controller-raise-on-open-redirects)
-option, which will be removed in a future Rails version. The new configuration provides more
-flexible control over open redirect protection.
+| Value            | Behavior                   |
+| ---------------- | -------------------------- |
+| `:log`           | Logs a warning             |
+| `:notify`        | Publishes an `open_redirect.action_controller` notification event |
+| `:raise`         | Raises an `ActionController::Redirecting::UnsafeRedirectError` |
 
-When set to `:log`, Rails will log a warning when an open redirect is detected.
-When set to `:notify`, Rails will publish an `open_redirect.action_controller`
-notification event. When set to `:raise`, Rails will raise an
-`ActionController::Redirecting::UnsafeRedirectError`.
-
-If `raise_on_open_redirects` is set to `true`, it will take precedence
+If [`raise_on_open_redirects`](#config-action-controller-raise-on-open-redirects)
+is set to `true`, it will take precedence
 over this configuration for backward compatibility, effectively forcing `:raise`
 behavior.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:log`               |
-| 7.0                   | `:raise`             |
+The default value is `:raise`.
 
 #### `config.action_controller.action_on_path_relative_redirect`
 
-Controls how Rails handles paths relative URL redirects.
+This option defines the behavior when the application redirects
+to a relative path (a path without a leading `/`).
 
-When set to `:log` (default), Rails will log a warning when a path relative URL redirect
-is detected. When set to `:notify`, Rails will publish an
-`unsafe_redirect.action_controller` notification event. When set to `:raise`, Rails
-will raise an `ActionController::Redirecting::UnsafeRedirectError`.
+Rails inserts the path into the app's host when rendering the
+redirect. For example, if the app is served as `example.com`:
 
-This helps detect potentially unsafe redirects that could be exploited for open
-redirect attacks.
+```ruby
+# Redirects to https://example.com/home
+redirect_to "/home"
+```
 
-The default value depends on the `config.load_defaults` target version:
+Redirecting to a relative path can leads to a vulnerability as it would
+redirect to a different host:
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:log`               |
-| 8.1                   | `:raise`             |
+```ruby
+# Redirects to https://example.comhome
+redirect_to "home"
 
+# Redirects to https://example.com@otherdomain.com
+redirect_to "@otherdomain.com"
+```
+
+This option helps detect such unsafe redirects. The available values
+are:
+
+| Value            | Behavior                   |
+| ---------------- | -------------------------- |
+| `:log`           | Logs a warning             |
+| `:notify`        | Publishes an `unsafe_redirect.action_controller` notification event |
+| `:raise`         | Raises an `ActionController::Redirecting::UnsafeRedirectError` |
 
 #### `config.action_controller.log_query_tags_around_actions`
 
-Determines whether controller context for query tags will be automatically
-updated via an `around_filter`. The default value is `true`.
+Determines whether the controller context for query tags will be automatically
+updated via an `around_filter`.
+
+The default value is `true`.
 
 #### `config.action_controller.wrap_parameters_by_default`
 
-Before Rails 7.0, new applications were generated with an initializer named
-`wrap_parameters.rb` that enabled parameter wrapping in `ActionController::Base`
-for JSON requests.
+A boolean value controlling whether [parameter wrapping][params_wrapper]
+is enabled by default for JSON requests.
 
-Setting this configuration value to `true` has the same behavior as the
-initializer, allowing applications to remove the initializer if they do not wish
-to customize parameter wrapping behavior.
+The default value is `true`.
 
-Regardless of this value, applications can continue to customize the parameter
-wrapping behavior as before in an initializer or per controller.
-
-See [`ParamsWrapper`][params_wrapper] for more information on parameter
-wrapping.
-
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.0                   | `true`               |
+NOTE: The default value for this option in Rails versions older than 7.0
+was `false`. However, apps contained a stock initializer file which set the
+value to `true`.
 
 [params_wrapper]: https://api.rubyonrails.org/classes/ActionController/ParamsWrapper.html
 
 #### `config.action_controller.allowed_redirect_hosts`
 
-Specifies a list of allowed hosts for redirects. `redirect_to` will allow redirects to them without raising an
+Registers an array of allowed hosts for redirects.
+
+`redirect_to` will allow redirects to them without raising an
 `UnsafeRedirectError` error.
-
-#### `ActionController::Base.wrap_parameters`
-
-Configures the [`ParamsWrapper`](https://api.rubyonrails.org/classes/ActionController/ParamsWrapper.html). This can be called at
-the top level, or on individual controllers.
 
 #### `config.action_controller.escape_json_responses`
 
-Configures the JSON renderer to escape HTML entities and Unicode characters that are invalid in JavaScript.
+A boolean flag which configures the JSON renderer to escape HTML entities
+and Unicode characters that are invalid in JavaScript.
 
-This is useful if you relied on the JSON response having those characters escaped to embed the JSON document in
-\<script> tags in HTML.
+This default value is `false`.
 
-This is mainly for compatibility when upgrading Rails applications, otherwise you can use the `:escape` option for
-`render json:` in specific controller actions.
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `true`               |
-| 8.1                   | `false`              |
+This option exists mainly for backwards compatibility.
+When escaping is required, use the `:escape` option for `render json:`
+in specific controller actions.
 
 #### `config.action_controller.rescue_from_event_backtrace`
+
+TODO continue
 
 Configures the `event_backtrace` attribute in the payload of `rescue_from_handled.action_controller` notifications, and `action_controller.rescue_from_handled` events.
 
