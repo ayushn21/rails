@@ -2201,77 +2201,72 @@ consider its impact if using it in a production environment.
 
 #### `config.active_record.query_log_tags_format`
 
-TODO continue
-A `Symbol` specifying the formatter to use for tags. Valid values are `:sqlcommenter` and `:legacy`.
-
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:legacy`            |
-| 7.1                   | `:sqlcommenter`      |
+A symbol specifying the formatter to use for query log tags. The default
+value is `:sqlcommenter`, alternatively you can also use `:legacy`.
 
 #### `config.active_record.cache_query_log_tags`
 
-Specifies whether or not to enable caching of query log tags. For applications
-that have a large number of queries, caching query log tags can provide a
-performance benefit when the context does not change during the lifetime of the
-request or job execution. Defaults to `false`.
+A boolean specifying whether to enable caching of query log tags. For
+applications that have a large number of queries, caching query log tags
+can provide a performance benefit when the context does not change during
+the lifetime of the request or job execution.
+
+Defaults to `false`.
 
 #### `config.active_record.query_log_tags_prepend_comment`
 
-Specifies whether or not to prepend query log tags comment to the query.
+A boolean that defines whether to prepend query log tags comment to the query.
 
-By default comments are appended at the end of the query. Certain databases, such as MySQL will
-truncate the query text. This is the case for slow query logs and the results of querying
-some InnoDB internal tables where the length of the query is more than 1024 bytes.
-In order to not lose the log tags comments from the queries, you can prepend the comments using this option.
+By default, comments are appended at the end of the query. Certain databases such
+as MySQL will truncate the query text. This is the case for slow query logs and
+the results of querying some InnoDB internal tables where the length of the query
+is more than 1024 bytes.
+
+In order to not lose the log tags comments from the queries, you can prepend the
+comments using this option.
 
 Defaults to `false`.
 
 #### `config.active_record.schema_cache_ignored_tables`
 
-**Note:** This configuration is deprecated in favor of
+WARNING: Deprecated in favor of
 [`config.active_record.schema_ignored_tables`](#config-active-record-schema-ignored-tables),
 and will be removed in a future Rails version. It is now an alias for that
 option, so setting it also excludes the tables from the schema file.
 
 #### `config.active_record.schema_ignored_tables`
 
-Define the list of tables that should be ignored when generating the schema
-cache and the schema file. It accepts an `Array` of strings, representing the
+Registers a list of tables to ignore when generating the schema
+cache and the schema file. It accepts an array of strings, representing the
 table names, or regular expressions.
-
-**Note:** This configuration replaces the deprecated
-[`config.active_record.schema_cache_ignored_tables`](#config-active-record-schema-cache-ignored-tables)
-and [`ActiveRecord::SchemaDumper.ignore_tables`](#activerecord-schemadumper-ignore-tables)
-options.
 
 #### `config.active_record.verbose_query_logs`
 
-Specifies if source locations of methods that call database queries should be logged below relevant queries. By default, the flag is `true` in development and `false` in all other environments.
+When enabled, the source locations of methods that call database queries
+will be logged below the relevant queries.
+
+The default value is `true` in development and `false` in all other
+environments.
 
 #### `config.active_record.sqlite3_adapter_strict_strings_by_default`
 
-Specifies whether the SQLite3Adapter should be used in a strict strings mode.
+Specifies whether the `SQLite3Adapter` should be used in a _strict strings_ mode.
 The use of a strict strings mode disables double-quoted string literals.
 
 SQLite has some quirks around double-quoted string literals.
-It first tries to consider double-quoted strings as identifier names, but if they don't exist
-it then considers them as string literals. Because of this, typos can silently go unnoticed.
+It first tries to consider double-quoted strings as identifier names, but
+if they don't exist it then considers them as string literals. As such, typos
+can silently go unnoticed.
+
 For example, it is possible to create an index for a non existing column.
 See [SQLite documentation](https://www.sqlite.org/quirks.html#double_quoted_string_literals_are_accepted) for more details.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.1                   | `true`               |
+The default value is `true`.
 
 #### `config.active_record.postgresql_adapter_decode_bytea`
 
-Specifies whether the PostgresqlAdapter should decode bytea columns.
+A boolean flag which controls whether the PostgreSQL adapter decodes
+bytea columns.
 
 ```ruby
 ActiveRecord::Base.connection
@@ -2279,16 +2274,12 @@ ActiveRecord::Base.connection
 ```
 
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 8.2                   | `true`               |
+The default value is `true`
 
 #### `config.active_record.postgresql_adapter_decode_dates`
 
-Specifies whether the PostgresqlAdapter should decode date columns.
+A boolean flag which controls whether the PostgreSQL adapter decodes
+date columns.
 
 ```ruby
 ActiveRecord::Base.connection
@@ -2296,98 +2287,105 @@ ActiveRecord::Base.connection
 ```
 
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.2                   | `true`               |
+The default value is `true`.
 
 #### `config.active_record.postgresql_adapter_decode_money`
 
-Specifies whether the PostgresqlAdapter should decode money columns.
+A boolean flag which controls whether the PostgreSQL adapter decodes
+date columns.
 
 ```ruby
 ActiveRecord::Base.connection
      .select_value("select '12.34'::money").class #=> BigDecimal
 ```
 
-
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 8.2                   | `true`               |
-
+The default value is `true`.
 
 #### `config.active_record.async_query_executor`
 
-Specifies how asynchronous queries are pooled.
+Configures the pooling of asynchronous queries.
 
-It defaults to `nil`, which means `load_async` is disabled and instead directly executes queries in the foreground.
-For queries to actually be performed asynchronously, it must be set to either `:global_thread_pool` or `:multi_thread_pool`.
+The default value is `nil`, which means `load_async` is disabled and
+instead directly executes queries in the foreground.
 
-`:global_thread_pool` will use a single pool for all databases the application connects to. This is the preferred configuration
-for applications with only a single database, or applications which only ever query one database shard at a time.
+Set the value as `:global_thread_pool` or `:multi_thread_pool` to perform
+queries asynchronously.
 
-`:multi_thread_pool` will use one pool per database, and each pool size can be configured individually in `database.yml` through the
-`max_threads` and `min_threads` properties. This can be useful to applications regularly querying multiple databases at a time, and that need to more precisely define the max concurrency.
+* `:global_thread_pool` will use a single pool for all databases the
+  application connects to. This is the preferred configuration
+  for applications with a single database, or applications which
+  only ever query one database shard at a time.
+
+* `:multi_thread_pool` will use one pool per database, and each pool size
+  can be configured individually in `database.yml` through the
+  `max_threads` and `min_threads` properties. This can be useful to
+  applications regularly querying multiple databases at a time, and
+  that need to more precisely define the max concurrency.
 
 #### `config.active_record.global_executor_concurrency`
 
-Used in conjunction with `config.active_record.async_query_executor = :global_thread_pool`, defines how many asynchronous
-queries can be executed concurrently.
+Defines how many asynchronous queries can be executed concurrently when used
+in conjunction with:
 
-Defaults to `4`.
+```
+config.active_record.async_query_executor = :global_thread_pool
+```
 
-This number must be considered in accordance with the database connection pool size configured in `database.yml`. The connection pool
-should be large enough to accommodate both the foreground threads (ie. web server or job worker threads) and background threads.
+The default is `4`.
 
-For each process, Rails will create one global query executor that uses this many threads to process async queries. Thus, the pool size
-should be at least `thread_count + global_executor_concurrency + 1`. For example, if your web server has a maximum of 3 threads,
-and `global_executor_concurrency` is set to 4, then your pool size should be at least 8.
+This number must be considered in accordance with the database connection
+pool size configured in `database.yml`. The connection pool should be large
+enough to accommodate both the foreground threads (web server or job worker
+threads) and background threads.
+
+For each process, Rails will create one global query executor that uses this
+many threads to process async queries. Thus, the pool size should be at
+least `thread_count + global_executor_concurrency + 1`.
+
+For example, if your web server has a maximum of 3 threads,
+and `global_executor_concurrency` is set to 4, then your pool size
+should be at least 8.
 
 #### `config.active_record.yaml_column_permitted_classes`
 
-Defaults to `[Symbol]`. Allows applications to include additional permitted classes to `safe_load()` on the `ActiveRecord::Coders::YAMLColumn`.
+Adds additional permitted classes to `safe_load()` on
+`ActiveRecord::Coders::YAMLColumn`.
+
+Accepts an array and the default is `[Symbol]`.
 
 #### `config.active_record.use_yaml_unsafe_load`
 
-Defaults to `false`. Allows applications to opt into using `unsafe_load` on the `ActiveRecord::Coders::YAMLColumn`.
+A boolean which allows applications to opt into using `unsafe_load`
+on `ActiveRecord::Coders::YAMLColumn`.
+
+Defaults to `false`.
 
 #### `config.active_record.raise_int_wider_than_64bit`
 
-Defaults to `true`. Determines whether to raise an exception or not when
-the PostgreSQL adapter is provided an integer that is wider than signed
-64bit representation.
+A boolean value which determines whether to raise an exception when
+the PostgreSQL adapter is provided an integer that is wider than a signed
+64-bit representation.
+
+Defaults to `true`.
 
 #### `config.active_record.generate_secure_token_on`
 
-Controls when to generate a value for `has_secure_token` declarations. By
-default, generate the value when the model is initialized:
+Sets the point in an object's lifecycle when the value for `has_secure_token`
+declarations is generated.
+
+The default is `:initialize`, or alternatively it can be set to `:create`.
 
 ```ruby
 class User < ApplicationRecord
   has_secure_token
 end
 
+# config.active_record.generate_secure_token_on = :initialize
+
 record = User.new
 record.token # => "fwZcXX6SkJBJRogzMdciS7wf"
-```
 
-With `config.active_record.generate_secure_token_on = :create`, generate the
-value when the model is created:
-
-```ruby
-# config/application.rb
-
-config.active_record.generate_secure_token_on = :create
-
-# app/models/user.rb
-class User < ApplicationRecord
-  has_secure_token on: :create
-end
+# config.active_record.generate_secure_token_on = :create
 
 record = User.new
 record.token # => nil
@@ -2395,60 +2393,71 @@ record.save!
 record.token # => "fwZcXX6SkJBJRogzMdciS7wf"
 ```
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:create`            |
-| 7.1                   | `:initialize`        |
-
-
 #### `config.active_record.permanent_connection_checkout`
 
-Controls whether `ActiveRecord::Base.connection` raises an error, emits a deprecation warning, or neither.
+`ActiveRecord::Base.connection` checks out a database connection from the
+pool and keeps it leased until the end of the request or job. This behavior
+can be undesirable in environments that use many more threads or fibers than
+there is available connections.
 
-`ActiveRecord::Base.connection` checkouts a database connection from the pool and keeps it leased until the end of
-the request or job. This behavior can be undesirable in environments that use many more threads or fibers than there
-is available connections.
+This configuration can be used to find and eliminate code that
+calls `ActiveRecord::Base.connection` and migrate it to
+`ActiveRecord::Base.with_connection` instead.
 
-This configuration can be used to track down and eliminate code that calls `ActiveRecord::Base.connection` and
-migrate it to use `ActiveRecord::Base.with_connection` instead.
+The accepted values are:
 
-The value can be set to `:disallowed`, `:deprecated`, or `true` to respectively raise an error, emit a deprecation
-warning, or neither.
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `true`               |
+| Value                 | Behavior                                        |
+| --------------------- | ----------------------------------------------- |
+| `:disallowed`         | Raises an error                                 |
+| `:deprecated`         | Emits a deprecation warning                     |
+| `true`                | Allows usage of `ActiveRecord::Base.connection` |
 
 #### `config.active_record.database_cli`
 
-Controls which CLI tool will be used for accessing the database when running `bin/rails dbconsole`. By default
-the standard tool for the database will be used (e.g. `psql` for PostgreSQL and `mysql` for MySQL). The option
-takes a hash which specifies the tool per-database system, and an array can be used where fallback options are
-required:
+Sets the CLI tool used to access the database via `bin/rails dbconsole`.
+
+By default, the standard tool for the database will be used
+(`psql` for PostgreSQL and `mysql` for MySQL).
+
+To customize this, define a hash mapping the tool to the database system.
 
 ```ruby
-# config/application.rb
-
-config.active_record.database_cli = { postgresql: "pgcli", mysql: %w[ mycli mysql ] }
+config.active_record.database_cli = {
+  postgresql: "pgcli",
+  mysql: %w[ mycli mysql ] # An array can be used to define fallbacks
+}
 ```
 
 #### `config.active_record.use_legacy_signed_id_verifier`
 
-Controls whether signed IDs are generated and verified using legacy options. Can be set to:
+Controls whether signed IDs are generated and verified using legacy options.
 
-* `:generate_and_verify` (default) - Generate and verify signed IDs using the following legacy options:
+Accepted options are:
 
-    ```ruby
-    { digest: "SHA256", serializer: JSON, url_safe: true }
-    ```
+* `:generate_and_verify` (default) - Generate and verify signed IDs using the
+  following legacy options:
 
-* `:verify` - Generate and verify signed IDs using options from [`Rails.application.message_verifiers`][], but fall back to verifying with the same options as `:generate_and_verify`.
+  ```ruby
+  { digest: "SHA256", serializer: JSON, url_safe: true }
+  ```
 
-* false - Generate and verify signed IDs using options from [`Rails.application.message_verifiers`][] only.
+* `:verify` - Generate and verify signed IDs using options from
+  [`Rails.application.message_verifiers`][], but fall back to verifying with the same
+  options as `:generate_and_verify`.
 
-The purpose of this setting is to provide a smooth transition to a unified configuration for all message verifiers. Having a unified configuration makes it more straightforward to rotate secrets and upgrade signing algorithms.
+* false - Generate and verify signed IDs using options from
+  [`Rails.application.message_verifiers`][] only.
 
-WARNING: Setting this to false may cause old signed IDs to become unreadable if `Rails.application.message_verifiers` is not properly configured. Use [`MessageVerifiers#rotate`][ActiveSupport::MessageVerifiers#rotate] or [`MessageVerifiers#prepend`][ActiveSupport::MessageVerifiers#prepend] to configure `Rails.application.message_verifiers` with the appropriate options, such as `:digest` and `:url_safe`.
+This setting provides a smooth transition to a unified configuration for
+all message verifiers. Having a unified configuration makes it more straightforward
+to rotate secrets and upgrade signing algorithms.
+
+WARNING: Setting this to false may cause old signed IDs to become unreadable
+if `Rails.application.message_verifiers` is not properly configured.
+Use [`MessageVerifiers#rotate`][ActiveSupport::MessageVerifiers#rotate] or
+[`MessageVerifiers#prepend`][ActiveSupport::MessageVerifiers#prepend] to
+configure `Rails.application.message_verifiers` with the appropriate options,
+such as `:digest` and `:url_safe`.
 
 [`Rails.application.message_verifiers`]: https://api.rubyonrails.org/classes/Rails/Application.html#method-i-message_verifiers
 [ActiveSupport::MessageVerifiers#rotate]: https://api.rubyonrails.org/classes/ActiveSupport/MessageVerifiers.html#method-i-rotate
@@ -2456,16 +2465,21 @@ WARNING: Setting this to false may cause old signed IDs to become unreadable if 
 
 #### `ActiveRecord::ConnectionAdapters::Mysql2Adapter.emulate_booleans` and `ActiveRecord::ConnectionAdapters::TrilogyAdapter.emulate_booleans`
 
-Controls whether the Active Record MySQL adapter will consider all `tinyint(1)` columns as booleans. Defaults to `true`.
+A flag controlling whether the Active Record MySQL adapter will consider all
+`tinyint(1)` columns as booleans. Defaults to `true`.
 
 #### `ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.create_unlogged_tables`
 
-Controls whether database tables created by PostgreSQL should be "unlogged", which can speed
-up performance but adds a risk of data loss if the database crashes. It is
-highly recommended that you do not enable this in a production environment.
+A boolean setting which defines whether database tables created by PostgreSQL
+should be "unlogged". This can speed up performance but adds a risk of data
+loss if the database crashes.
+
+It is highly recommended that you do not enable this in a
+production environment.
+
 Defaults to `false` in all environments.
 
-To enable this for tests:
+Enable this in the `test` environment using:
 
 ```ruby
 # config/environments/test.rb
@@ -2477,117 +2491,156 @@ end
 
 #### `ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.datetime_type`
 
-Controls what native type the Active Record PostgreSQL adapter should use when you call `datetime` in
-a migration or schema. It takes a symbol which must correspond to one of the
-configured `NATIVE_DATABASE_TYPES`. The default is `:timestamp`, meaning
-`t.datetime` in a migration will create a "timestamp without time zone" column.
+Configures the native type used by Active Record's PostgreSQL adapter
+when `datetime` is called in a migration or schema.
 
-To use "timestamp with time zone":
+It accepts a symbol corresponding to a value in
+`ActiveRecord::ConnectionAdapters::PostgreSQLAdapter::NATIVE_DATABASE_TYPES`.
 
-```ruby
-# config/application.rb
+The default is `:timestamp`, meaning `t.datetime` in a migration will
+create a "timestamp without time zone" column.
 
-ActiveSupport.on_load(:active_record_postgresqladapter) do
-  self.datetime_type = :timestamptz
-end
-```
+If you wish to customize this to use a "timestamp with a time zone",
+set `:timestamptz`.
 
-You should run `bin/rails db:migrate` to rebuild your schema.rb if you change this.
+Run `bin/rails db:migrate` to rebuild your `schema.rb` if you change
+this option.
 
 #### `ActiveRecord::SchemaDumper.ignore_tables`
 
-Accepts an array of tables that should _not_ be included in any generated schema file.
+Accepts an array of tables to **exclude** in any generated
+schema file.
 
-**Note:** This configuration is deprecated in favor of
+WARNING: This configuration is deprecated in favor of
 [`config.active_record.schema_ignored_tables`](#config-active-record-schema-ignored-tables),
 and will be removed in a future Rails version. It is now an alias for that
 option, so setting it also excludes the tables from the schema cache.
 
 #### `ActiveRecord::SchemaDumper.fk_ignore_pattern`
 
-Allows setting a different regular expression that will be used to decide
-whether a foreign key's name should be dumped to db/schema.rb or not. By
-default, foreign key names starting with `fk_rails_` are not exported to the
-database schema dump. Defaults to `/^fk_rails_[0-9a-f]{10}$/`.
+Customizes the regular expression used to decide whether a foreign key's
+name should be dumped to `db/schema.rb`.
+
+By default, foreign key names starting with `fk_rails_` are not exported to the
+database schema dump.
+
+The default value is `/^fk_rails_[0-9a-f]{10}$/`.
 
 #### `config.active_record.encryption.support_unencrypted_data`
 
-When `true`, unencrypted data can be read normally. When `false`, it will raise errors. Default: `false`.
+When `true`, unencrypted data can be read normally. When `false`,
+it will raise errors.
+
+The default is `false`.
 
 #### `config.active_record.encryption.extend_queries`
 
-When `true`, queries referencing deterministically encrypted attributes will be modified to include additional values if needed. Those additional values will be the clean version of the value (when `config.active_record.encryption.support_unencrypted_data` is `true`) and values encrypted with previous encryption schemes, if any (as provided with the `previous:` option). Default: `false`.
+A boolean flag which, when enabled, sets that queries referencing deterministically
+encrypted attributes will be modified to include additional values if needed.
+Those additional values will be the clean version of the value
+(when `config.active_record.encryption.support_unencrypted_data` is `true`)
+and values encrypted with previous encryption schemes, if any
+(as provided with the `previous:` option).
+
+The default is `false`.
 
 #### `config.active_record.encryption.encrypt_fixtures`
 
-When `true`, encryptable attributes in fixtures will be automatically encrypted when loaded. Default: `false`.
+A boolean value controlling whether encryptable attributes in fixtures will
+be automatically encrypted when loaded.
+
+The default is `false`.
 
 #### `config.active_record.encryption.store_key_references`
 
-When `true`, a reference to the encryption key is stored in the headers of the encrypted message. This makes for faster decryption when multiple keys are in use. Default: `false`.
+A boolean value defining whether a reference to the encryption key
+is stored in the headers of the encrypted message. This makes for
+faster decryption when multiple keys are in use.
+
+The default is `false`.
 
 #### `config.active_record.encryption.add_to_filter_parameters`
 
-When `true`, encrypted attribute names are added automatically to [`config.filter_parameters`](#config-filter-parameters) and won't be shown in logs. Default: `true`.
+A boolean value which, when enabled, adds encrypted attribute names are automatically
+to [`config.filter_parameters`](#config-filter-parameters).
+
+The default is `true`.
 
 #### `config.active_record.encryption.excluded_from_filter_parameters`
 
-You can configure a list of params that won't be filtered out when `config.active_record.encryption.add_to_filter_parameters` is true. Default: `[]`.
+Registers a list of params that won't be filtered out when
+[`config.active_record.encryption.add_to_filter_parameters`](#config-active-record-encryption-add-to-filter-parameters)
+is true.
+
+The default is an empty array: `[]`.
 
 #### `config.active_record.encryption.validate_column_size`
 
-Adds a validation based on the column size. This is recommended to prevent storing huge values using highly compressible payloads. Default: `true`.
+A boolean value denoting whether to add a validation based on the column
+size. This is recommended to prevent storing huge values using
+highly compressible payloads.
+
+The default is `true`.
 
 #### `config.active_record.encryption.primary_key`
 
-The key or lists of keys used to derive root data encryption keys. The way they are used depends on the key provider configured. It's preferred to configure it via the `active_record_encryption.primary_key` credential.
+The key or lists of keys used to derive root data encryption keys.
+The way they are used depends on the key provider configured.
+
+The recommended technique is to set it in the credentials file
+under the key: `active_record_encryption.primary_key`.
 
 #### `config.active_record.encryption.deterministic_key`
 
-The key or list of keys used for deterministic encryption. It's preferred to configure it via the `active_record_encryption.deterministic_key` credential.
+The key or list of keys used for deterministic encryption.
+
+The recommended technique is to set it in the credentials file
+under the key: `active_record_encryption.deterministic_key`.
 
 #### `config.active_record.encryption.key_derivation_salt`
 
-The salt used when deriving keys. It's preferred to configure it via the `active_record_encryption.key_derivation_salt` credential.
+The salt used when deriving keys.
+
+The recommended technique is to set it in the credentials file
+under the key: `active_record_encryption.key_derivation_salt`.
 
 #### `config.active_record.encryption.forced_encoding_for_deterministic_encryption`
 
-The default encoding for attributes encrypted deterministically. You can disable
-forced encoding by setting this option to `nil`. It's `Encoding::UTF_8` by default.
+Sets the default encoding for attributes encrypted deterministically.
+The default is `Encoding::UTF_8`.
+
+Forced encoding can be disabled by setting this option to `nil`.
 
 #### `config.active_record.encryption.hash_digest_class`
 
 Sets the digest algorithm used by Active Record Encryption.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is      |
-| --------------------- | ------------------------- |
-| (original)            | `OpenSSL::Digest::SHA1`   |
-| 7.1                   | `OpenSSL::Digest::SHA256` |
+The default value is `OpenSSL::Digest::SHA256`.
 
 #### `config.active_record.encryption.support_sha1_for_non_deterministic_encryption`
 
-Enables support for decrypting existing data encrypted using a SHA-1 digest
-class. When `false`, it will only support the digest configured in
-`config.active_record.encryption.hash_digest_class`.
+A boolean flag, when enabled allows existing data encrypted using a SHA-1 digest
+to be decrypted.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `true`               |
-| 7.1                   | `false`              |
+The default value is `false` — meaning only the digest configured in
+`config.active_record.encryption.hash_digest_class` will be supported.
 
 #### `config.active_record.encryption.compressor`
 
-The compressor used to compress encrypted payloads. The default is `Zlib`. You can use your own compressor by setting this to a class that responds to `deflate` and `inflate`.
+Sets the compressor used to compress encrypted payloads. The default is `Zlib`.
+
+This option can be set to any class responding to `deflate` and `inflate`.
 
 #### `config.active_record.protocol_adapters`
 
-When using a URL to configure the database connection, this option provides a mapping from the protocol to the underlying
-database adapter. For example, this means the environment can specify `DATABASE_URL=mysql://localhost/database` and Rails will map
-`mysql` to the `mysql2` adapter, but the application can also override these mappings:
+When using a URL to configure the database connection, this option
+provides a mapping from the protocol to the underlying
+database adapter.
+
+For example, the environment can specify `DATABASE_URL=mysql://localhost/database`
+and Rails will map `mysql` to the `mysql2` adapter.
+
+These mappings may be overridden as:
 
 ```ruby
 config.active_record.protocol_adapters.mysql = "trilogy"
@@ -2597,7 +2650,10 @@ If no mapping is found, the protocol is used as the adapter name.
 
 #### `config.active_record.deprecated_associations_options`
 
-If present, this has to be a hash with keys `:mode` and/or `:backtrace`:
+Accepts a hash which controls behavior when a
+[deprecated association](association_basics.html#deprecated) is accessed.
+
+The hash must contain the keys `:mode` and/or `:backtrace`:
 
 ```ruby
 config.active_record.deprecated_associations_options = { mode: :notify, backtrace: true }
@@ -2622,52 +2678,52 @@ Clean backtraces are computed using the Active Record backtrace cleaner.
 
 #### `config.active_record.raise_on_missing_required_finder_order_columns`
 
-Raises an error when order dependent finder methods (e.g. `#first`, `#second`) are called without `order` values
-on the relation, and the model does not have any order columns (`implicit_order_column`, `query_constraints`, or
-`primary_key`) to fall back on.
+Raises an error when order dependent finder methods (for example, `#first` or `#second`)
+are called without `order` values on the relation, where the model does not have any
+order columns (`implicit_order_column`, `query_constraints`,
+or `primary_key`) to fall back on.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 8.1                   | `true`               |
+The default value is `true`.
 
 #### `config.active_record.shuffle_unordered_selects`
 
-Shuffles the rows of every `SELECT` Active Record generates that has no `ORDER BY` clause.
+A boolean flag determining whether to shuffle the rows of every `SELECT` statement
+without an `ORDER BY` clause generated by Active Record.
 
-The order of such a query is not specified: the database is free to return the rows in any order, and that
-order can change when an index is added, when the data grows, or when the query planner changes its mind.
-Enabling this option makes the lack of order explicit, so code and tests that accidentally depend on the
-order a particular database happens to return today fail immediately instead of breaking later.
+Since the order of such a query is not specified, the database is free to
+return the rows in any order. The order can change when an index is added,
+when the data grows, or based on the query planner's algorithm.
 
-```ruby
-# config/environments/test.rb
-config.active_record.shuffle_unordered_selects = true
-```
+Enabling this option makes the lack of order explicit. This way, errors caused
+code and tests that accidentally depend on the order of the rows can be found
+immediately.
 
-The order is fully random and drawn again on every execution, so a query cannot accidentally settle into an
-order that an assertion keeps passing against.
+The order is fully random and drawn again on every execution, so
+a query cannot accidentally settle into an order that an assertion
+keeps passing against.
 
-The option is best effort, and two things bound what it can surface.
+There are two caveats to be aware of:
 
-The first is that Active Record has to recognise the query, which it does from the Arel it built. A query that
-reaches it as already-compiled SQL is left alone: SQL you wrote yourself, and association loading, `find` and
-`find_by`, which are served from a precompiled statement by `ActiveRecord::StatementCache`. Relations, `pluck`,
-calculations and eager loading are covered, inside a query cache block or out.
+The first is that Active Record has to recognise the query, which it does
+from the Arel it built. A query that reaches it as already-compiled SQL is
+left alone: SQL you wrote yourself, and association loading, `find` and
+`find_by`, which are served from a precompiled statement by
+`ActiveRecord::StatementCache`. Relations, `pluck`,
+calculations and eager loading are covered, inside a query cache block
+or out.
 
-The second is that rows are shuffled after the database has returned them, so the option cannot change *which*
-rows come back. Queries ending in `LIMIT 1` are unaffected — `find`, `find_by`, `take`, `pick`, `exists?`,
-`has_one` and `belongs_to` — which makes this weaker than SQLite's `reverse_unordered_selects` pragma. A query
-with an `ORDER BY` is never shuffled even when that ordering is not a total order, so ties on a non-unique
-column stay hidden. And the SQL in your log is the SQL that was sent, so replaying it by hand will not
-reproduce the order your application saw.
+The second is that rows are shuffled after the database has returned them,
+so the option cannot change *which* rows come back. Queries ending in `LIMIT 1`
+are unaffected (such as calls to `find`, `find_by`, `take`, `pick`, `exists?`,
+`has_one`, and `belongs_to`).
 
-This is a development aid intended for the test or development environments, and it is never enabled by
-`config.load_defaults`.
+A query with an `ORDER BY` is never shuffled even when that ordering is not a
+total order, so ties on a non-unique column stay hidden. The SQL in your log
+is the SQL that was sent, so replaying it by hand will not reproduce the order
+your application saw.
 
-The default value is `false`.
+The default value is `false`. as this is a development aid intended for the test
+or development environments.
 
 ### Configuring Action Controller
 
