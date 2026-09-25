@@ -3003,75 +3003,74 @@ in specific controller actions.
 
 #### `config.action_controller.rescue_from_event_backtrace`
 
-TODO continue
+Configures the `event_backtrace` attribute in the payload of
+`rescue_from_handled.action_controller` notifications, and
+`action_controller.rescue_from_handled` events.
 
-Configures the `event_backtrace` attribute in the payload of `rescue_from_handled.action_controller` notifications, and `action_controller.rescue_from_handled` events.
+The accepted values are:
 
-* `:array` - Stores the backtrace as an array of strings.
-* `nil` - Stores the backtrace as the first string of the backtrace, stripping the `Rails.root` from the controller path.
-
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `nil`                |
-| 8.2                   | `:array`             |
+* `:array`: Stores the backtrace as an array of strings.
+* `nil`: Stores the backtrace as the first string of the backtrace,
+  stripping the `Rails.root` from the controller path.
 
 ### Configuring Action Dispatch
 
 #### `config.action_dispatch.cookies_serializer`
 
-Specifies which serializer to use for cookies. Accepts the same values as
+Specifies the serializer to use for cookies. It accepts the same values as
 [`config.active_support.message_serializer`](#config-active-support-message-serializer),
 plus `:hybrid` which is an alias for `:json_allow_marshal`.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:marshal`           |
-| 7.0                   | `:json`              |
+The default value is `:json`.
 
 #### `config.action_dispatch.debug_exception_log_level`
 
-Configures the log level used by the [`ActionDispatch::DebugExceptions`][]
+Sets the log level used by the [`ActionDispatch::DebugExceptions`][]
 middleware when logging uncaught exceptions during requests.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:fatal`             |
-| 7.1                   | `:error`             |
+The default value is `:error`.
 
 [`ActionDispatch::DebugExceptions`]: https://api.rubyonrails.org/classes/ActionDispatch/DebugExceptions.html
 
 #### `config.action_dispatch.default_headers`
 
-Is a hash with HTTP headers that are set by default in each response.
+A hash containing HTTP headers that are set by default in each response.
 
-The default value depends on the `config.load_defaults` target version:
+The default is:
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | <pre><code>{<br>  "X-Frame-Options" => "SAMEORIGIN",<br>  "X-XSS-Protection" => "1; mode=block",<br>  "X-Content-Type-Options" => "nosniff",<br>  "X-Download-Options" => "noopen",<br>  "X-Permitted-Cross-Domain-Policies" => "none",<br>  "Referrer-Policy" => "strict-origin-when-cross-origin"<br>}</code></pre> |
-| 7.0                   | <pre><code>{<br>  "X-Frame-Options" => "SAMEORIGIN",<br>  "X-XSS-Protection" => "0",<br>  "X-Content-Type-Options" => "nosniff",<br>  "X-Download-Options" => "noopen",<br>  "X-Permitted-Cross-Domain-Policies" => "none",<br>  "Referrer-Policy" => "strict-origin-when-cross-origin"<br>}</code></pre> |
-| 7.1                   | <pre><code>{<br>  "X-Frame-Options" => "SAMEORIGIN",<br>  "X-XSS-Protection" => "0",<br>  "X-Content-Type-Options" => "nosniff",<br>  "X-Permitted-Cross-Domain-Policies" => "none",<br>  "Referrer-Policy" => "strict-origin-when-cross-origin"<br>}</code></pre> |
-| 8.2                   | <pre><code>{<br>  "X-Frame-Options" => "SAMEORIGIN"<br>  "X-Content-Type-Options" => "nosniff",<br>  "X-Permitted-Cross-Domain-Policies" => "none",<br>  "Referrer-Policy" => "strict-origin-when-cross-origin"<br>}</code></pre> |
+```ruby
+{
+  "X-Frame-Options" => "SAMEORIGIN",
+  "X-Content-Type-Options" => "nosniff",
+  "X-Permitted-Cross-Domain-Policies" => "none",
+  "Referrer-Policy" => "strict-origin-when-cross-origin"
+}
+```
 
 #### `config.action_dispatch.default_charset`
 
-Specifies the default character set for all renders. Defaults to `nil`.
+Specifies the default character set for all renders.
+
+Defaults to `nil`.
 
 #### `config.action_dispatch.tld_length`
 
-Sets the TLD (top-level domain) length for the application. Defaults to `1`.
+Sets the TLD (top-level domain) length for the application.
+
+Defaults to `1`.
 
 #### `config.action_dispatch.domain_extractor`
 
-Configures the domain extraction strategy used by Action Dispatch for parsing host names into domain and subdomain components. This must be an object that responds to `domain_from(host, tld_length)` and `subdomains_from(host, tld_length)` methods.
+Sets the object used by Action Dispatch to parse host names into
+domain and subdomain components. The object must respond to
+`domain_from(host, tld_length)` and
+`subdomains_from(host, tld_length)`.
 
-Defaults to `ActionDispatch::Http::URL::DomainExtractor`, which provides the standard domain parsing logic. You can provide a custom extractor to implement specialized domain parsing behavior:
+The default is `ActionDispatch::Http::URL::DomainExtractor`, which
+provides the standard domain parsing logic.
+
+Alternatively, you can provide a custom extractor which
+implements specialized domain parsing behavior:
 
 ```ruby
 class CustomDomainExtractor
@@ -3089,57 +3088,74 @@ config.action_dispatch.domain_extractor = CustomDomainExtractor
 
 #### `config.action_dispatch.ignore_accept_header`
 
-Is used to determine whether to ignore accept headers from a request. Defaults to `false`.
+A boolean which determines whether to ignore `Accept` HTTP headers
+in a request.
+
+Defaults to `false`.
 
 #### `config.action_dispatch.strict_accept_header`
 
-Controls whether an `Accept` header containing `*/*` forces an HTML response.
-When enabled, Rails honors more specific types instead — e.g. `Accept:
-application/json, */*` returns JSON instead of HTML.
+A boolean controlling whether an `Accept` header containing
+`*/*` forces an HTML response.
 
-The default value depends on the `config.load_defaults` target version:
+When enabled, Rails honors more specific types instead — for example,
+`Accept: application/json, */*` returns JSON instead of HTML.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 8.2                   | `true`               |
+The default value is `true`.
 
 #### `config.action_dispatch.x_sendfile_header`
 
-Specifies server specific X-Sendfile header. This is useful for accelerated file sending from server. For example it can be set to 'X-Sendfile' for Apache.
+Sets a custom server-specific _send file_ header.  This header may be used by
+a web server that sits in front of Rails to intercept the response and stream
+a static file directly to the client, bypassing the Rails process and
+enhancing performance.
+
+For example, it can be set to 'X-Sendfile' for Apache.
+
+The default value is `nil`.
 
 #### `config.action_dispatch.http_auth_salt`
 
-Sets the HTTP Auth salt value. Defaults
-to `'http authentication'`.
+Sets the salt for HTTP Authentication.
+
+The default is `'http authentication'`.
 
 #### `config.action_dispatch.signed_cookie_salt`
 
-Sets the signed cookies salt value.
+Sets the salt value used when signing cookies.
+
 Defaults to `'signed cookie'`.
 
 #### `config.action_dispatch.encrypted_cookie_salt`
 
-Sets the encrypted cookies salt value. Defaults to `'encrypted cookie'`.
+Sets the salt for encrypting cookies.
+
+The default is `'encrypted cookie'`.
 
 #### `config.action_dispatch.encrypted_signed_cookie_salt`
 
-Sets the signed encrypted cookies salt value. Defaults to `'signed encrypted
-cookie'`.
+Sets the salt value used when generating signed and encrypted cookies.
+
+The default is `'signed encrypted cookie'`.
 
 #### `config.action_dispatch.authenticated_encrypted_cookie_salt`
 
-Sets the authenticated encrypted cookie salt. Defaults to `'authenticated
-encrypted cookie'`.
+Sets the salt for authenticated encrypted cookies.
+
+The default is `'authenticated encrypted cookie'`.
 
 #### `config.action_dispatch.encrypted_cookie_cipher`
 
-Sets the cipher to be used for encrypted cookies. This defaults to
-`"aes-256-gcm"`.
+Configures the cipher to use when encrypting cookies.
+
+The default is `"aes-256-gcm"`. Any valid OpenSSL cipher
+(`OpenSSL::Cipher.ciphers`) may be used.
 
 #### `config.action_dispatch.signed_cookie_digest`
 
-Sets the digest to be used for signed cookies. This defaults to `"SHA1"`.
+Configures the digest algorithm to use for signing cookies.
+
+The default is `"SHA1"`.
 
 #### `config.action_dispatch.cookies_rotations`
 
@@ -3147,26 +3163,18 @@ Allows rotating secrets, ciphers, and digests for encrypted and signed cookies.
 
 #### `config.action_dispatch.use_authenticated_cookie_encryption`
 
-Controls whether signed and encrypted cookies use the AES-256-GCM cipher or the
-older AES-256-CBC cipher.
+A boolean controlling whether signed and encrypted cookies use the
+`AES-256-GCM` cipher (`true`) or the older `AES-256-CBC` cipher (`false`).
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 5.2                   | `true`               |
+The default value is `true`.
 
 #### `config.action_dispatch.use_cookies_with_metadata`
 
+TODO continue ...
+
 Enables writing cookies with the purpose metadata embedded.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 6.0                   | `true`               |
+The default value is `true`.
 
 #### `config.action_dispatch.perform_deep_munge`
 
