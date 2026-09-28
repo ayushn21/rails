@@ -3170,28 +3170,33 @@ The default value is `true`.
 
 #### `config.action_dispatch.use_cookies_with_metadata`
 
-TODO continue ...
+Signed and encrypted cookies are generated using the
+[`ActiveSupport::MessageVerifier`][] and [`ActiveSupport::MessageEncryptor`][]
+classes. Messages generated using these classes can contain additional metadata
+such as `purpose` and `expiry` for added security.
 
-Enables writing cookies with the purpose metadata embedded.
+This option controls whether this metadata is included when securing cookies.
 
 The default value is `true`.
 
+[`ActiveSupport::MessageVerifier`]: https://api.rubyonrails.org/classes/ActiveSupport/MessageVerifier.html
+[`ActiveSupport::MessageEncryptor`]: https://api.rubyonrails.org/classes/ActiveSupport/MessageEncryptor.html
+
 #### `config.action_dispatch.perform_deep_munge`
 
-Configures whether `deep_munge` method should be performed on the parameters.
+Configures whether `deep_munge` method should be called on the parameters.
 See [Security Guide](security.html#unsafe-query-generation) for more
-information. It defaults to `true`.
+information.
+
+It defaults to `true`.
 
 #### `config.action_dispatch.rescue_responses`
 
-Configures what exceptions are assigned to an HTTP status. It accepts a hash and you can specify pairs of exception/status.
+Configures a mapping between exceptions and HTTP response status codes. This way,
+the status code returned can be customized for specific exceptions.
 
-```ruby
-# It's good to use #[]= or #merge! to respect the default values
-config.action_dispatch.rescue_responses["MyAuthenticationError"] = :unauthorized
-```
-
-Use `ActionDispatch::ExceptionWrapper.rescue_responses` to observe the configuration. By default, it is defined as:
+The default configuration (shown below) can be observed
+using `ActionDispatch::ExceptionWrapper.rescue_responses`:
 
 ```ruby
 {
@@ -3203,46 +3208,101 @@ Use `ActionDispatch::ExceptionWrapper.rescue_responses` to observe the configura
   "ActionController::UnknownFormat" => :not_acceptable,
   "ActionDispatch::Http::MimeNegotiation::InvalidType" => :not_acceptable,
   "ActionController::MissingExactTemplate" => :not_acceptable,
-  "ActionController::InvalidAuthenticityToken" => :unprocessable_entity,
-  "ActionController::InvalidCrossOriginRequest" => :unprocessable_entity,
+  "ActionController::InvalidAuthenticityToken" => :unprocessable_content,
+  "ActionController::InvalidCrossOriginRequest" => :unprocessable_content,
   "ActionDispatch::Http::Parameters::ParseError" => :bad_request,
   "ActionController::BadRequest" => :bad_request,
   "ActionController::ParameterMissing" => :bad_request,
+  "ActionController::TooManyRequests" => :too_many_requests,
   "Rack::QueryParser::ParameterTypeError" => :bad_request,
   "Rack::QueryParser::InvalidParameterError" => :bad_request,
   "ActiveRecord::RecordNotFound" => :not_found,
   "ActiveRecord::StaleObjectError" => :conflict,
-  "ActiveRecord::RecordInvalid" => :unprocessable_entity,
-  "ActiveRecord::RecordNotSaved" => :unprocessable_entity
+  "ActiveRecord::RecordInvalid" => :unprocessable_content,
+  "ActiveRecord::RecordNotSaved" => :unprocessable_content
 }
 ```
 
-Any exceptions that are not configured will be mapped to 500 Internal Server Error.
+Add a mapping using:
+
+```ruby
+# Use #[]= or #merge! so the default values aren't overwritten
+config.action_dispatch.rescue_responses["MyAuthenticationError"] = :unauthorized
+```
+
+Rails will fallback to a `500 Internal Server Error` if an exception isn't
+mapped to a specific response code.
 
 #### `config.action_dispatch.wrapper_exceptions`
 
-Configures which exceptions are unwrapped. Wrapper exceptions will have their cause reported by the exception wrapper
-instead of themselves.
+This configuration option defines an array containing names of
+exception classes which will be _unwrapped_ before computing the
+HTTP status code to return when an exception is raised.
+
+The default value is:
 
 ```ruby
-config.action_dispatch.wrapper_exceptions += [WrapperException]
+[ "ActionView::Template::Error" ]
+```
 
+Additional exceptions can be added using:
+
+```ruby
+config.action_dispatch.wrapper_exceptions += ["WrapperException"]
+```
+
+Let's take an example.
+
+```ruby
 begin
-  raise OriginalException
-rescue OriginalException
-  raise WrapperException
+  raise FirstException
+rescue FirstException
+  raise SecondException
 end
 ```
 
-In the above example the `WrapperException` will be unwrapped and the `OriginalException` will be reported.
+The above snippet demonstrates a scenario where one exception is rescued to
+raise another exception. The second exception can be considered a
+_wrapper exception_. Calling `cause` on the `SecondException` object
+will return the `FirstException` object.
 
-Use `ActionDispatch::ExceptionWrapper.wrapper_exceptions` to observe the configuration. By default, it is defined as:
+Rails injects raised exceptions into an [`ActionDispatch::ExceptionWrapper`][]
+object, which extracts metadata and other helpful information from the
+exception. This object is used to retrieve the HTTP reponse status code for
+an exception, as defined by
+[`config.action_dispatch.rescue_responses`](#config-action-dispatch-rescue-responses).
+
+Going back to the earlier example, and encapsulating it within a
+controller action:
 
 ```ruby
-[
-  "ActionView::Template::Error"
-]
+def index
+  begin
+    raise FirstException
+  rescue FirstException
+    raise SecondException
+  end
+end
 ```
+
+NOTE: The above action is unlikely to appear in production as shown, but the
+underlying concept applies.
+
+With `config.action_dispatch.wrapper_exceptions` unchanged, `SecondException`
+will be used to determine the appropriate HTTP response code.
+
+If `SecondException` is added to this configuration option:
+
+```ruby
+config.action_dispatch.wrapper_exceptions += [ "SecondException" ]
+```
+
+then, the corresponding HTTP response code for `FirstException` will be
+rendered.
+
+[`ActionDispatch::ExceptionWrapper`]: https://api.rubyonrails.org/classes/ActionDispatch/ExceptionWrapper.html
+
+TODO reread and continue
 
 #### `config.action_dispatch.silent_exceptions`
 
