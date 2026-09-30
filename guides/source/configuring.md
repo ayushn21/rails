@@ -755,7 +755,7 @@ Sets up the application-wide encoding. Defaults to UTF-8.
 
 #### `config.exceptions_app`
 
-Sets the exceptions Rack application invoked by the `ShowException`
+Sets the exceptions Rack application invoked by the [`ActionDispatch::ShowExceptions`][]
 middleware when an exception happens.
 
 Defaults to `ActionDispatch::PublicExceptions.new(Rails.public_path)`.
@@ -1214,7 +1214,7 @@ The default value of "1.0" is set in `config/initializers/assets.rb`.
 
 #### `config.assets.logger`
 
-Registers a logger conforming to the interface of Log4r or
+Registers a logger conforming to the interface of `Log4r` or
 the default Ruby `Logger` class.
 
 Defaults to `config.logger`.
@@ -1464,7 +1464,7 @@ irb> person.errors.messages
 #### `config.active_record.logger`
 
 Accepts a logger conforming to the interface of `Log4r` or the default
-Ruby Logger class, which is then passed on to any new database connections
+Ruby `Logger` class, which is then passed on to any new database connections
 made.
 
 Retrieve this logger by calling `logger` on either an Active Record model
@@ -2763,10 +2763,10 @@ that all helpers are available across all views in the application.
 #### `config.action_controller.logger`
 
 Accepts a logger conforming to the interface of `Log4r` or the default
-Ruby Logger class, which is then used to log information from Action
+Ruby `Logger` class, which is then used to log information from Action
 Controller.
 
-Set to `nil` to disable logging.
+Set it to `nil` to disable logging.
 
 #### `config.action_controller.request_forgery_protection_token`
 
@@ -3195,7 +3195,7 @@ It defaults to `true`.
 Configures a mapping between exceptions and HTTP response status codes. This way,
 the status code returned can be customized for specific exceptions.
 
-The default configuration (shown below) can be observed
+The default configuration (shown below) can be retrieved
 using `ActionDispatch::ExceptionWrapper.rescue_responses`:
 
 ```ruby
@@ -3236,10 +3236,14 @@ mapped to a specific response code.
 #### `config.action_dispatch.wrapper_exceptions`
 
 This configuration option defines an array containing names of
-exception classes which will be _unwrapped_ before computing the
-HTTP status code to return when an exception is raised.
+exception classes which will be _unwrapped_ before being reported
+by the [`ActiveSupport::ErrorReporter`][].
 
-The default value is:
+The unwrapped exception will also be used to determine the
+HTTP response status code.
+
+The default value is shown below, and can be obtained using
+`ActionDispatch::ExceptionWrapper.wrapper_exceptions`:
 
 ```ruby
 [ "ActionView::Template::Error" ]
@@ -3251,29 +3255,10 @@ Additional exceptions can be added using:
 config.action_dispatch.wrapper_exceptions += ["WrapperException"]
 ```
 
-Let's take an example.
+NOTE: Ensure you insert the string representation of the class name
+into this array, not the constant itself.
 
-```ruby
-begin
-  raise FirstException
-rescue FirstException
-  raise SecondException
-end
-```
-
-The above snippet demonstrates a scenario where one exception is rescued to
-raise another exception. The second exception can be considered a
-_wrapper exception_. Calling `cause` on the `SecondException` object
-will return the `FirstException` object.
-
-Rails injects raised exceptions into an [`ActionDispatch::ExceptionWrapper`][]
-object, which extracts metadata and other helpful information from the
-exception. This object is used to retrieve the HTTP reponse status code for
-an exception, as defined by
-[`config.action_dispatch.rescue_responses`](#config-action-dispatch-rescue-responses).
-
-Going back to the earlier example, and encapsulating it within a
-controller action:
+Consider the following example:
 
 ```ruby
 def index
@@ -3285,11 +3270,17 @@ def index
 end
 ```
 
-NOTE: The above action is unlikely to appear in production as shown, but the
-underlying concept applies.
+NOTE: The above controller action is unlikely to appear in production
+as shown, but the underlying concept applies.
+
+The above snippet demonstrates a scenario where one exception is rescued to
+raise another exception. The second exception can be considered a
+_wrapper exception_. Calling `cause` on the `SecondException` object
+will return the `FirstException` object.
 
 With `config.action_dispatch.wrapper_exceptions` unchanged, `SecondException`
-will be used to determine the appropriate HTTP response code.
+will be reported by [`ActiveSupport::ErrorReporter`][] and used to
+determine the appropriate HTTP response code.
 
 If `SecondException` is added to this configuration option:
 
@@ -3297,19 +3288,23 @@ If `SecondException` is added to this configuration option:
 config.action_dispatch.wrapper_exceptions += [ "SecondException" ]
 ```
 
-then, the corresponding HTTP response code for `FirstException` will be
-rendered.
+then, `cause` will be called on the `SecondException` object which will
+return a `FirstException`. This is the error that will be reported, and its
+corresponding HTTP response code rendered.
 
-[`ActionDispatch::ExceptionWrapper`]: https://api.rubyonrails.org/classes/ActionDispatch/ExceptionWrapper.html
-
-TODO reread and continue
+[`ActiveSupport::ErrorReporter`]: https://api.rubyonrails.org/classes/ActiveSupport/ErrorReporter.html
 
 #### `config.action_dispatch.silent_exceptions`
 
-Configures which exceptions should not fall back to showing framework-level backtraces when there is no application
-backtrace. This is useful for silencing noisy backtraces for exceptions raised at the framework or plugin level.
+When the application backtrace for an exception is empty, Rails falls back
+to showing the framework-level backtrace.
 
-Use `ActionDispatch::ExceptionWrapper.silent_exceptions` to observe the configuration. By default, it is defined as:
+This option registers an array of exceptions where Rails should not fall back
+to the framework-level backtrace. This can be used to silence noisy
+backtraces for exceptions raised at the framework or plugin level.
+
+The default value is shown below, and can be retrieved using
+`ActionDispatch::ExceptionWrapper.silent_exceptions`:
 
 ```ruby
 [
@@ -3318,11 +3313,22 @@ Use `ActionDispatch::ExceptionWrapper.silent_exceptions` to observe the configur
 ]
 ```
 
+Insert a custom exception using:
+
+```ruby
+config.action_dispatch.silent_exceptions += [ "CustomException" ]
+```
+
+NOTE: Ensure you insert the string representation of the class name
+into this array, not the constant itself.
+
 #### `config.action_dispatch.rescue_templates`
 
-Configures the templates used to render exceptions. It accepts a hash and you can specify pairs of exception => template.
+Configures a mapping between exceptions and the template rendered when
+they are raised.
 
-Use `ActionDispatch::ExceptionWrapper.rescue_templates` to observe the configuration. By default, it is defined as:
+`ActionDispatch::ExceptionWrapper.rescue_templates` retrieves the default
+value:
 
 ```ruby
 {
@@ -3335,317 +3341,494 @@ Use `ActionDispatch::ExceptionWrapper.rescue_templates` to observe the configura
 }
 ```
 
-All exceptions that are not configured will map to Rails' built in diagnostics template.
+Only templates built into Rails can be used in this configuration hash. The files
+are located at `actionpack/lib/action_dispatch/middleware/templates/rescues`. You
+cannot specify a template located within your application.
+
+When an exception doesn't have an explicitly configured template, Rails falls back
+to the `diagnostics` template.
 
 #### `config.action_dispatch.cookies_same_site_protection`
 
-Configures the default value of the `SameSite` attribute when setting cookies.
-When set to `nil`, the `SameSite` attribute is not added. To allow the value of
-the `SameSite` attribute to be configured dynamically based on the request, a
-proc may be specified. For example:
+Sets the default value of the [`SameSite` attribute](https://web.dev/articles/samesite-cookies-explained)
+when creating cookies. When set to `nil`, the `SameSite` attribute is not
+added.
+
+The `SameSite` attribute may be set dynamically using a Proc:
 
 ```ruby
 config.action_dispatch.cookies_same_site_protection = ->(request) do
-  :strict unless request.user_agent == "TestAgent"
+  case request.user_agent
+  when "TestAgent"
+    nil
+  when /App/
+    :strict
+  else
+    :lax
+  end
 end
 ```
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `nil`                |
-| 6.1                   | `:lax`               |
+The default value is :lax.
 
 #### `config.action_dispatch.ssl_default_redirect_status`
 
 Configures the default HTTP status code used when redirecting non-GET/HEAD
-requests from HTTP to HTTPS in the `ActionDispatch::SSL` middleware.
+requests from HTTP to HTTPS in the [`ActionDispatch::SSL`][] middleware.
 
-The default value depends on the `config.load_defaults` target version:
+The default value is `308`.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `307`                |
-| 6.1                   | `308`                |
+[`ActionDispatch::SSL`]: https://api.rubyonrails.org/classes/ActionDispatch/SSL.html
 
 #### `config.action_dispatch.log_rescued_responses`
 
-Enables logging those unhandled exceptions configured in `rescue_responses`. It
-defaults to `true`.
+Configures whether unhandled exceptions registered in
+[`config.action_dispatch.rescue_responses`][#config-action-dispatch-rescue-responses]
+should be logged.
+
+The default value is `true`.
 
 #### `config.action_dispatch.show_exceptions`
 
-The `config.action_dispatch.show_exceptions` configuration controls how Action Pack (specifically the [`ActionDispatch::ShowExceptions`](/configuring.html#actiondispatch-showexceptions) middleware) handles exceptions raised while responding to requests.
+The [`ActionDispatch::ShowExceptions`][] Rack middleware invokes a
+Rack application ([`config.exceptions_app`](#config-exceptions-app)) to
+render error pages for raised exceptions.
 
-Setting the value to `:all` configures Action Pack to rescue from exceptions and render corresponding error pages. For example, Action Pack would rescue from an `ActiveRecord::RecordNotFound` exception and render the contents of `public/404.html` with a `404 Not Found` status code.
+This option sets the strategy for which exceptions are handled through the
+exceptions app.
 
-Setting the value to `:rescuable` configures Action Pack to rescue from exceptions defined in [`config.action_dispatch.rescue_responses`](/configuring.html#config-action-dispatch-rescue-responses), and raise all others. For example, Action Pack would rescue from `ActiveRecord::RecordNotFound`, but would raise a `NoMethodError`.
+The value can be set to:
 
-Setting the value to `:none` configures Action Pack to raise all exceptions.
+* `:all`
+  All exceptions are rescued and handled using the exceptions app.
 
-* `:all` - render error pages for all exceptions
-* `:rescuable` - render error pages for exceptions declared by [`config.action_dispatch.rescue_responses`](/configuring.html#config-action-dispatch-rescue-responses)
-* `:none` - raise all exceptions
+* `:rescuable`
+  Exceptions defined in [`config.action_dispatch.rescue_responses`](#config-action-dispatch-rescue-responses)
+  will be handled using the exceptions app. All other exceptions will
+  not be handled within Rails.
 
-| Starting with version | The default value is  |
-| --------------------- | --------------------- |
-| (original)            | `true`                |
-| 7.1                   | `:all`                |
+* `:none`
+  No exceptions will be handled within Rails.
+
+The default value is `:all`.
+
+[`ActionDispatch::ShowExceptions`]: https://api.rubyonrails.org/classes/ActionDispatch/ShowExceptions.html
 
 #### `config.action_dispatch.strict_freshness`
 
-Configures whether the `ActionDispatch::ETag` middleware should prefer the `ETag` header over the `Last-Modified` header when both are present in the response.
+When an HTTP request contains both `If-Modified-Since` and `If-None-Match`,
+this option configures how cache freshness should be evaluated.
 
-If set to `true`, when both headers are present only the `ETag` is considered as specified by RFC 7232 section 6.
+The default value is `true` — which means  that `If-None-Match`, when present,
+is preferred over `If-Modified-Since` to determine freshness.
 
-If set to `false`, when both headers are present, both headers are checked and both need to match for the response to be considered fresh.
-
-| Starting with version | The default value is  |
-| --------------------- | --------------------- |
-| (original)            | `false`               |
-| 8.0                   | `true`                |
+When `false`, both `If-None-Match` and `If-Modified-Since` are considered
+equally.
 
 #### `config.action_dispatch.always_write_cookie`
 
-Cookies will be written at the end of a request if they marked as insecure, if the request is made over SSL, or if the request is made to an onion service.
+Rails will only write the `Set-Cookie` header to the response if:
 
-If set to `true`, cookies will be written even if this criteria is not met.
+* The request is made over SSL.
+* The request is _not_ made over SSL, but the cookie is marked as _insecure_.
+* The request is made to a [Tor Onion service](https://en.wikipedia.org/wiki/Tor_(network)).
 
-This defaults to `true` in `development`, and `false` in all other environments.
+Enabling this option will override the above logic and **always**
+write the `Set-Cookie` header to the response.
+
+It is set to `true` in `development`, and `false` in all other environments.
 
 #### `config.action_dispatch.verbose_redirect_logs`
 
-Specifies if source locations of redirects should be logged below relevant log lines. By default, the flag is `true` in development and `false` in all other environments.
+A boolean flag which specifies whether source locations of redirects
+should be logged below relevant log lines.
 
-#### `ActionDispatch::Callbacks.before`
-
-Takes a block of code to run before the request.
-
-#### `ActionDispatch::Callbacks.after`
-
-Takes a block of code to run after the request.
+By default, it is `true` in `development` and `false` in all other
+environments.
 
 ### Configuring Action View
 
-`config.action_view` includes a small number of configuration settings:
-
 #### `config.action_view.cache_template_loading`
 
-Controls whether or not templates should be reloaded on each request. Defaults to `!config.enable_reloading`.
+A boolean flag controlling whether templates are cached in memory
+after they are loaded for the first time.
+
+When enabled, the first time a template is required, it
+is read from disk and then cached for future use. Conversely,
+when `false`, the template is loaded from disk for every request.
+
+Defaults to [`!config.enable_reloading`](#config-enable-reloading).
 
 #### `config.action_view.field_error_proc`
 
-Provides an HTML generator for displaying errors that come from Active Model. The block is evaluated within
-the context of an Action View template. The default is
+A proc to generate custom HTML for displaying Active Model errors
+in a Rails form. It is evaluated within the context of an
+`ActionView::Base` object.
+
+The proc is yielded two arguments:
+
+* `html_tag`: The complete HTML tag for the field containing the error.
+  For example, if a password field contained an error, the `html_tag`
+  value might look like:
+
+  ```ruby
+  "<input class='input' type='password' name='user[password]' id='user_password'>"
+  ```
+
+* `instance`: An instance of the _field_ from the
+  [form builder](form_helpers.html#customizing-form-builders) that contains the
+  error. It is usually an instance of a `ActionView::Helpers::Tags::Base` subclass.
+  For a password field, it will be an instance of
+  `ActionView::Helpers::Tags::PasswordField`.
+
+You can render a partial within this proc as:
 
 ```ruby
-Proc.new { |html_tag, instance| content_tag :div, html_tag, class: "field_with_errors" }
+ActionView::Base.field_error_proc = proc do |html_tag, instance|
+  render "application/form_errors",
+    html_tag: html_tag, instance: instance
+end
+```
+
+Or alternatively, render the required markup inline:
+
+```ruby
+ActionView::Base.field_error_proc = Proc.new { |html_tag, instance|
+  unless html_tag =~ /^<label/
+    content_tag :span, class: "error" do
+      safe_join([
+        html_tag,
+        tag.span { instance.error_message.to_sentence }
+      ])
+    end
+  else
+    html_tag
+  end
+}
 ```
 
 #### `config.action_view.default_form_builder`
 
-Tells Rails which form builder to use by default. The default is
-`ActionView::Helpers::FormBuilder`. If you want your form builder class to be
-loaded after initialization (so it's reloaded on each request in development),
-you can pass it as a `String`.
+Configures the default [form builder](form_helpers.html#customizing-form-builders)
+for generating Rails forms.
+
+The default value is
+[`ActionView::Helpers::FormBuilder`](https://api.rubyonrails.org/classes/ActionView/Helpers/FormBuilder.html).
+
+Specify the class as a string to load it after initialization, which means it
+will be hot-reloaded in `development`.
 
 #### `config.action_view.logger`
 
-Accepts a logger conforming to the interface of Log4r or the default Ruby Logger class, which is then used to log information from Action View. Set to `nil` to disable logging.
+Registers a logger conforming to the interface of `Log4r` or the
+default Ruby `Logger` class, which is then used to log information
+from Action View.
+
+The default is [`config.logger`](#config-logger). Set it to `nil`
+to disable logging.
 
 #### `config.action_view.erb_trim_mode`
 
-Controls if certain ERB syntax should trim. It defaults to `'-'`, which turns on trimming of tail spaces and newline when using `<%= -%>` or `<%= =%>`. Setting this to anything else will turn off trimming support.
+Controls whether ERB's trimming syntax should be enabled.
+
+The default value is `'-'`, which trims tail spaces and
+newline characters when using `<%= -%>` or `<%= =%>`.
+
+All other values will disable trimming.
 
 #### `config.action_view.erb_implementation`
 
-Controls the default ERB implementation to use. It defaults to `Erubi`.
+Sets the ERB implementation to use.
+
+The default is `Erubi`.
 
 #### `config.action_view.escape_ignore_list`
 
-Control whether template should be escaped based on the mime type. Defaults to `["text/plain"]`.
+Registers an array containing MIME types which should not be escaped
+by the ERB handler during rendering.
+
+The default value is `nil`, which means that only "text/plain" will
+not be escaped.
+
+`"text/plain"` is a fallback which will be overwritten when you assign
+this option, so ensure you include it in your custom array:
+
+```ruby
+config.action_view.escape_ignore_list = [ "text/csv", "text/plain" ]
+```
 
 #### `config.action_view.strip_trailing_newlines`
 
-Strip trailing newlines from rendered output. Defaults to `false`.
+When enabled, trailing newlines will be stripped from rendered
+output.
+
+Defaults to `false`.
 
 #### `config.action_view.frozen_string_literal`
 
-Compiles the ERB template with the `# frozen_string_literal: true` magic comment, making all string literals frozen and saving allocations. Set to `true` to enable it for all views.
+When enabled, ERB template will be compiled with the
+`# frozen_string_literal: true` magic comment, which freezes all
+string literals and saves memory allocations.
+
+The default value is `nil`. Set it to `true` to enable it for all views.
 
 #### `config.action_view.embed_authenticity_token_in_remote_forms`
 
-Allows you to set the default behavior for `authenticity_token` in forms with
-`remote: true`. By default it's set to `false`, which means that remote forms
-will not include `authenticity_token`, which is helpful when you're
-fragment-caching the form. Remote forms get the authenticity from the `meta`
-tag, so embedding is unnecessary unless you support browsers without
-JavaScript. In such case you can either pass `authenticity_token: true` as a
-form option or set this config setting to `true`.
+When using [Rails UJS](https://guides.rubyonrails.org/v6.1/working_with_javascript_in_rails.html#unobtrusive-javascript),
+forms may be submitted using JavaScript by specifying `data-remote="true"` on the
+HTML `form` element, or `local: false` on the
+[`form_with`](https://api.rubyonrails.org/classes/ActionView/Helpers/FormHelper.html#method-i-form_with)
+helper.
+
+This option controls whether remote forms contain an `authenticity_token`
+for CSRF protection. The default value is `nil`, which will insert
+an authenticity token in remote Rails forms.
+
+Set it to `false` to exclude the `authenticity_token`, which might
+be useful for fragment caching.
+
+WARNING: Rails UJS is deprecated an excluded from modern Rails versions
+(starting from v7.0). This option is retained for backwards compatibility.
+Rails UJS's functionality has been replaced with
+[Turbo](working_with_javascript_in_rails.html#turbo)
 
 #### `config.action_view.prefix_partial_path_with_controller_namespace`
 
-Determines whether or not partials are looked up from a subdirectory in templates rendered from namespaced controllers. For example, consider a controller named `Admin::ArticlesController` which renders this template:
+Determines the lookup strategy for partials used in templates rendered
+from namespaced controllers.
+
+For example, consider a controller named `Admin::ArticlesController`
+which renders this partial in one of its templates:
 
 ```erb
+<%# app/controllers/admin/articles/index.html.erb %>
+
 <%= render @article %>
 ```
 
-The default setting is `true`, which uses the partial at `/admin/articles/_article.erb`. Setting the value to `false` would render `/articles/_article.erb`, which is the same behavior as rendering from a non-namespaced controller such as `ArticlesController`.
+The default behavior (`true`), will render the partial
+`/admin/articles/_article.erb`.
+
+Setting the value to `false` will render `/articles/_article.erb`,
+which is the same behavior as rendering from a non-namespaced
+controller such as `ArticlesController`.
 
 #### `config.action_view.automatically_disable_submit_tag`
 
-Determines whether `submit_tag` should automatically disable on click, this
-defaults to `true`.
+Determines whether `submit_tag` should automatically disable on click.
+
+The default value is `true`.
 
 #### `config.action_view.debug_missing_translation`
 
-Determines whether to wrap the missing translations key in a `<span>` tag or not. This defaults to `true`.
+When `true`, missing translations will render an error in
+place of the string.
+
+This defaults to `true`.
 
 #### `config.action_view.form_with_generates_remote_forms`
 
-Determines whether `form_with` generates remote forms or not.
+A boolean flag that determines whether `form_with` generates
+forms with `data-remote="true"` set on the HTML element.
 
-The default value depends on the `config.load_defaults` target version:
+The default value is `false`.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| 5.1                   | `true`               |
-| 6.1                   | `false`              |
+WARNING: Remote forms are designed for use with
+[Rails UJS](https://guides.rubyonrails.org/v6.1/working_with_javascript_in_rails.html#unobtrusive-javascript),
+which is deprecated and excluded from modern versions of Rails (starting
+with v7.0). This option is retained for backwards compatilibity. Rails
+UJS's functionality has been replaced with
+[Turbo](working_with_javascript_in_rails.html#turbo).
 
 #### `config.action_view.form_with_generates_ids`
 
-Determines whether `form_with` generates ids on inputs.
+A boolean controlling whether `form_with` generates an HTML `id` attribute
+for all input fields.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 5.2                   | `true`               |
+The default value is `true`.
 
 #### `config.action_view.default_enforce_utf8`
 
-Determines whether forms are generated with a hidden tag that forces older versions of Internet Explorer to submit forms encoded in UTF-8.
+Determines whether forms are generated with a hidden tag that forces
+older versions of Internet Explorer to submit forms encoded in `UTF-8`.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `true`               |
-| 6.0                   | `false`              |
+The default value is `false`.
 
 #### `config.action_view.image_loading`
 
-Specifies a default value for the `loading` attribute of `<img>` tags rendered by the `image_tag` helper. For example, when set to `"lazy"`, `<img>` tags rendered by `image_tag` will include `loading="lazy"`, which [instructs the browser to wait until an image is near the viewport to load it](https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement/loading#lazy). (This value can still be overridden per image by passing e.g. `loading: "eager"` to `image_tag`.) Defaults to `nil`.
+Specifies a default value for the `loading` attribute of `<img>` tags
+rendered by the [`image_tag`][] helper.
+
+For example, when set to `"lazy"`, `<img>` tags rendered by
+`image_tag` will include
+[`loading="lazy"`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement/loading#lazy).
+
+This value can be overridden per image:
+
+```erb
+<%= image_tag("profile.jpg", loading: :eager) %>
+```
+
+The default is `nil`.
+
+[`image_tag`]: https://api.rubyonrails.org/classes/ActionView/Helpers/AssetTagHelper.html#method-i-image_tag
 
 #### `config.action_view.image_decoding`
 
-Specifies a default value for the `decoding` attribute of `<img>` tags rendered by the `image_tag` helper. Defaults to `nil`.
+Specifies a default value for the
+[`decoding`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement/decoding)
+attribute of `<img>` tags rendered by the [`image_tag`][] helper.
+
+Defaults to `nil`.
 
 #### `config.action_view.annotate_rendered_view_with_filenames`
 
-Determines whether to annotate rendered view with template file names. This defaults to `false`.
+When enabled, rendered views will be annotated with comments denoting
+the source template files. This can be observed in the browser's web
+inspector:
+
+```erb
+<!-- BEGIN app/views/layouts/application.html.erb-->
+<!DOCTYPE html>
+<html>
+  <%# ... %>
+  <!-- BEGIN app/views/posts/new.html.erb-->
+
+  <%# ... %>
+
+  <!-- END app/views/posts/new.html.erb-->
+  <%# ... %>
+
+</html>
+<!-- END app/views/layouts/application.html.erb-->
+```
+
+The default value is `false`, but the stock `config/environments/development.rb`
+file sets it to `true`.
 
 #### `config.action_view.preload_links_header`
 
-Determines whether `javascript_include_tag` and `stylesheet_link_tag` will generate a `link` header that preload assets.
+Determines whether `javascript_include_tag` and `stylesheet_link_tag`
+will generate a `link` header that preload assets.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `nil`                |
-| 6.1                   | `true`               |
+The default value is `true`.
 
 #### `config.action_view.button_to_generates_button_tag`
 
-When `false`, `button_to` will render a `<button>` or an `<input>` inside a
-`<form>` depending on how content is passed (`<form>` omitted for brevity):
+When `true` (the default), [`button_to`][] will always generate a `<button>`
+inside a `<form>`.
+
+When `false`, the rendered output depends on how the content is passed:
 
 ```erb
 <%= button_to "Content", "/" %>
-# => <input type="submit" value="Content">
 
+<%# renders %>
+
+<form class="button_to" method="post" action="/">
+  <input type="submit" value="Content">
+  <input type="hidden" name="authenticity_token" value="...">
+</form>
+```
+
+```erb
 <%= button_to "/" do %>
   Content
 <% end %>
-# => <button type="submit">Content</button>
+
+<%# renders %>
+
+<form class="button_to" method="post" action="/">
+  <button type="submit">
+    Content
+  </button>
+  <input type="hidden" name="authenticity_token" value="...">
+</form>
 ```
 
-Setting this value to `true` makes `button_to` generate a `<button>` tag inside
-the `<form>` in both cases.
-
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.0                   | `true`               |
+[`button_to`]: https://api.rubyonrails.org/classes/ActionView/Helpers/UrlHelper.html#method-i-button_to
 
 #### `config.action_view.apply_stylesheet_media_default`
 
-Determines whether `stylesheet_link_tag` will render `screen` as the default
-value for the `media` attribute when it's not provided.
+A boolean flag which, when `true` adds the
+[`media=screen` HTML attribute](https://developer.mozilla.org/en-US/docs/Web/API/HTMLLinkElement/media)
+when calling `stylesheet_link_tag`.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `true`               |
-| 7.0                   | `false`              |
+The default value is `false`.
 
 #### `config.action_view.prepend_content_exfiltration_prevention`
 
-Determines whether or not the `form_tag` and `button_to` helpers will produce HTML tags prepended with browser-safe (but technically invalid) HTML that guarantees their contents cannot be captured by any preceding unclosed tags. The default value is `false`.
+When enabled, Rails form helpers (including `button_to`) will prepended
+the form with browser-safe (but technically invalid) HTML that guarantees
+their contents cannot be captured by any preceding unclosed tags.
+
+```html#1
+<!-- '"` --><!-- </textarea></xmp> --></option></form>
+<form action="/posts" accept-charset="UTF-8" method="post">
+  <!-- ... -->
+</form>
+```
+
+The default value is `false`.
 
 #### `config.action_view.sanitizer_vendor`
 
-Configures the set of HTML sanitizers used by Action View by setting `ActionView::Helpers::SanitizeHelper.sanitizer_vendor`. The default value depends on the `config.load_defaults` target version:
+Configures the HTML sanitizer used by Action View.
 
-| Starting with version | The default value is                 | Which parses markup as |
-|-----------------------|--------------------------------------|------------------------|
-| (original)            | `Rails::HTML4::Sanitizer`            | HTML4                  |
-| 7.1                   | `Rails::HTML5::Sanitizer` (see NOTE) | HTML5                  |
+The default value is `Rails::HTML5::Sanitizer`.
 
-NOTE: `Rails::HTML5::Sanitizer` is not supported on JRuby, so on JRuby platforms Rails will fall back to `Rails::HTML4::Sanitizer`.
+NOTE: `Rails::HTML5::Sanitizer` is not supported on JRuby, so on
+JRuby platforms Rails will fall back to `Rails::HTML4::Sanitizer`.
 
 #### `config.action_view.remove_hidden_field_autocomplete`
 
-When enabled, hidden inputs generated by `form_tag`, `token_tag`, `method_tag`, and the hidden parameter fields included in `button_to` forms will omit the `autocomplete="off"` attribute.
+When enabled, all hidden input fields generated by Rails helpers **will not**
+include the HTML attribute `autocomplete="off"`.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 8.1                   | `true`               |
+The default value is `true`.
 
 #### `config.action_view.render_tracker`
 
-Configures the strategy for tracking dependencies between Action View templates.
+Registers the tracker used to compute a template's dependency tree.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:regex`             |
-| 8.1                   | `:ruby`              |
+When the digestor builds a template's dependency tree (to compute the cache
+keys used by `cache` blocks and `stale?` checks), it asks the dependency
+tracker which other templates a given template renders.
+
+The default is `:ruby`, which uses the Prism parser to compute a template's
+dependencies.
+
+The legacy option is `:regex`, which scans the template source using a
+regex to determine its dependencies.
+
+Other templating languages may register custom trackers to compute their
+dependencies, which can then be assigned to this option.
+
+```ruby
+ActiveSupport.on_load(:action_view) do
+  ActionView::Template.register_template_handler :mtl, MyTemplateLanguage::Handler
+  ActionView::DependencyTracker.register_tracker :mtl, MyTemplateLanguage::DependencyTracker
+end
+
+Rails.app.config.action_view.render_tracker = :mtl
+```
 
 ### Configuring Action Mailbox
 
-`config.action_mailbox` provides the following configuration options:
-
 #### `config.action_mailbox.logger`
 
-Contains the logger used by Action Mailbox. It accepts a logger conforming to the interface of Log4r or the default Ruby Logger class. The default is `Rails.logger`.
+Registers the logger used by Action Mailbox. It accepts a logger conforming
+to the interface of `Log4r` or the default Ruby `Logger` class.
 
-```ruby
-config.action_mailbox.logger = ActiveSupport::Logger.new(STDOUT)
-```
+The default is [`config.logger`](#config-logger).
 
 #### `config.action_mailbox.incinerate_after`
 
-Accepts an `ActiveSupport::Duration` indicating how long after processing `ActionMailbox::InboundEmail` records should be destroyed. It defaults to `30.days`.
+An [`ActiveSupport::Duration`](https://api.rubyonrails.org/classes/ActiveSupport/Duration.html)
+object that determines the time period after which processed
+`ActionMailbox::InboundEmail` records will be destroyed.
+
+The default is `30.days`.
 
 ```ruby
 # Incinerate inbound emails 14 days after processing.
@@ -3654,57 +3837,57 @@ config.action_mailbox.incinerate_after = 14.days
 
 #### `config.action_mailbox.queues.incineration`
 
-Accepts a symbol indicating the Active Job queue to use for incineration jobs.
-When this option is `nil`, incineration jobs are sent to the default Active Job
-queue (see [`config.active_job.default_queue_name`][]).
+Configures the Active Job queue for incineration jobs.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:action_mailbox_incineration` |
-| 6.1                   | `nil`                |
+The default is `nil` — which will send incineration jobs to the
+[default Actieve Job queue](#config-active-job-default-queue).
 
 #### `config.action_mailbox.queues.routing`
 
-Accepts a symbol indicating the Active Job queue to use for routing jobs. When
-this option is `nil`, routing jobs are sent to the default Active Job queue (see
-[`config.active_job.default_queue_name`][]).
+Configures the Active Job queue for routing jobs.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:action_mailbox_routing` |
-| 6.1                   | `nil`                |
+The default is `nil` — which will send routing jobs to the
+[default Actieve Job queue](#config-active-job-default-queue).
 
 #### `config.action_mailbox.storage_service`
 
-Accepts a symbol indicating the Active Storage service to use for uploading emails. When this option is `nil`, emails are uploaded to the default Active Storage service (see `config.active_storage.service`).
+Configures the Active Storage service used to upload emails.
+
+The default is `nil` — which will use the
+[default Active Storage Service](#config-active-storage-service).
 
 ### Configuring Action Mailer
 
-There are a number of settings available on `config.action_mailer`:
-
 #### `config.action_mailer.asset_host`
 
-Sets the host for the assets. Useful when CDNs are used for hosting assets rather than the application server itself. You should only use this if you have a different configuration for Action Controller, otherwise use `config.asset_host`.
+Sets the host for the assets. This is useful when a CDN is used to
+host assets rather than the application server itself.
+
+The default is [`config.asset_host`](#config-asset-host).
+Only use this option when Action Controller requires a different asset host
+from Action Mailer.
 
 #### `config.action_mailer.logger`
 
-Accepts a logger conforming to the interface of Log4r or the default Ruby Logger class, which is then used to log information from Action Mailer. Set to `nil` to disable logging.
+Registers the logger for Action Mailer. It accepts a logger conforming to
+the interface of `Log4r` or the default Ruby `Logger` class.
+
+The default is [`config.logger`](#config-logger). Set to
+`nil` to disable logging.
 
 #### `config.action_mailer.delivery_method`
 
-Defines the delivery method. The following options are available:
+Configures the delivery method for Action Mailer emails.
 
-* `:smtp` - Sends email using SMTP. Configure it with
-  [`config.action_mailer.smtp_settings`][]. This is the default.
-* `:sendmail` - Sends email using sendmail. Configure it with
-  [`config.action_mailer.sendmail_settings`][].
+The following options are available:
+
+* `:smtp` (default) - Sends email using SMTP. Configure it with
+  [`config.action_mailer.smtp_settings`][].
+* `:sendmail` - Sends email using [sendmail](https://en.wikipedia.org/wiki/Sendmail).
+  Configure it with [`config.action_mailer.sendmail_settings`][].
 * `:file` - Saves emails to files. Configure it with
   [`config.action_mailer.file_settings`][].
-* `:test` - Saves emails to the `ActionMailer::Base.deliveries` array.
+* `:test` - Stores emails in memory in the `ActionMailer::Base.deliveries` array.
 
 You can also use a custom delivery method by either:
 
@@ -3728,62 +3911,80 @@ examples.
 
 #### `config.action_mailer.smtp_settings`
 
-Allows detailed configuration for the `:smtp` delivery method. It accepts a hash of options, which can include any of these options:
+Configures the `:smtp` delivery method. It accepts a hash of options,
+which may include the following:
 
-* `:address` - Allows you to use a remote mail server. Just change it from its default "localhost" setting.
-* `:port` - On the off chance that your mail server doesn't run on port 25, you can change it.
-* `:domain` - If you need to specify a HELO domain, you can do it here.
-* `:user_name` - If your mail server requires authentication, set the username in this setting.
-* `:password` - If your mail server requires authentication, set the password in this setting.
-* `:authentication` - If your mail server requires authentication, you need to specify the authentication type here. This is a symbol and one of `:plain`, `:login`, `:cram_md5`.
-* `:enable_starttls` - Use STARTTLS when connecting to your SMTP server and fail if unsupported. It defaults to `false`.
-* `:enable_starttls_auto` - Detects if STARTTLS is enabled in your SMTP server and starts to use it. It defaults to `true`.
-* `:openssl_verify_mode` - When using TLS, you can set how OpenSSL checks the certificate. This is useful if you need to validate a self-signed and/or a wildcard certificate. This can be the name of one of the OpenSSL verify constants, `'none'` or `'peer'` - or the constant directly `OpenSSL::SSL::VERIFY_NONE` or `OpenSSL::SSL::VERIFY_PEER`, respectively.
-* `:ssl/:tls` - Enables the SMTP connection to use SMTP/TLS (SMTPS: SMTP over direct TLS connection).
+* `:address` - The SMTP server's host name or IP address. The default is `"localhost"`.
+* `:port` - The port number for the SMTP server. The default is `25`.
+* `:domain` - The domain to use for the `HELO` handshake.
+* `:user_name` - The username to authenticate with the mail server.
+* `:password` - The password to authenticate with the mail server.
+* `:authentication` - The authentication type, which must be one
+  of: `:plain`, `:login`, or `:cram_md5`.
+* `:enable_starttls` - Force `STARTTLS` when connecting to the SMTP server and fail
+  if unsupported. Defaults to `false`.
+* `:enable_starttls_auto` - Enables `STARTTLS` when the SMTP server supports it.
+  It defaults to `true`.
+* `:openssl_verify_mode` - The strategy used to verify certificates. This is
+  useful if you need to validate a self-signed or a wildcard certificate.
+  The option accepts an OpenSSL verify constant (`OpenSSL::SSL::VERIFY_NONE` or `
+  OpenSSL::SSL::VERIFY_PEER`).
+* `:ssl/:tls` - Enables the SMTP connection to use
+  SMTP/TLS (SMTPS: SMTP over direct TLS connection).
 * `:open_timeout` - Number of seconds to wait while attempting to open a connection.
 * `:read_timeout` - Number of seconds to wait until timing-out a read(2) call.
 
-Additionally, it is possible to pass any [configuration option `Mail::SMTP` respects](https://github.com/mikel/mail/blob/master/lib/mail/network/delivery_methods/smtp.rb).
+Additionally, it is possible to pass
+any [configuration option accepted by `Mail::SMTP`](https://github.com/mikel/mail/blob/master/lib/mail/network/delivery_methods/smtp.rb).
 
 #### `config.action_mailer.smtp_timeout`
 
-Prior to version 2.8.0, the `mail` gem did not configure any default timeouts
-for its SMTP requests. This configuration enables applications to configure
-default values for both `:open_timeout` and `:read_timeout` in the `mail` gem so
-that requests do not end up stuck indefinitely.
+This option sets the values for both `:open_timeout` and `:read_timeout`
+in the [`mail`][] gem. The default is `5`.
 
-The default value depends on the `config.load_defaults` target version:
+Prior to v2.8.0, the [`mail`][] gem did not configure any default timeouts
+for its SMTP requests.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `nil`                |
-| 7.0                   | `5`                  |
+[`mail`]: https://github.com/mikel/mail
 
 #### `config.action_mailer.sendmail_settings`
 
-Allows detailed configuration for the `:sendmail` delivery method. It accepts a hash of options, which can include any of these options:
+Configures the `:sendmail` delivery method.
+
+It accepts a hash of options, which can include:
 
 * `:location` - The location of the sendmail executable. Defaults to `/usr/sbin/sendmail`.
 * `:arguments` - The command line arguments. Defaults to `%w[ -i ]`.
 
 #### `config.action_mailer.file_settings`
 
-Configures the `:file` delivery method. It accepts a hash of options, which can include:
+Configures the `:file` delivery method.
+
+It accepts a hash of options, which can include:
 
 * `:location` - The location where files are saved. Defaults to `"#{Rails.root}/tmp/mails"`.
-* `:extension` - The file extension. Defaults to the empty string.
+* `:extension` - The file extension. The default is an empty string.
 
 #### `config.action_mailer.raise_delivery_errors`
 
-Specifies whether to raise an error if email delivery cannot be completed. It defaults to `true`.
+A boolean flag which, when enabled, will raise an error when
+email delivery cannot be completed.
+
+It defaults to `true`.
 
 #### `config.action_mailer.perform_deliveries`
 
-Specifies whether mail will actually be delivered and is `true` by default. It can be convenient to set it to `false` for testing.
+Specifies whether mail will actually be delivered.
+
+It is `true` by default but can be set to `false` for testing.
 
 #### `config.action_mailer.default_options`
 
-Configures Action Mailer defaults. Use to set options like `from` or `reply_to` for every mailer. These default to:
+Configures a set of default options for emails generated by Action Mailer.
+
+Use this option to globally set fields such as `from` or `reply_to`.
+
+The default settings are:
 
 ```ruby
 {
@@ -3804,23 +4005,39 @@ config.action_mailer.default_options = {
 
 #### `config.action_mailer.observers`
 
-Registers observers which will be notified when mail is delivered.
+Registers an array of [observers](action_mailer_basics.html#observing-emails)
+which will be notified after a email is delivered.
+
+The elements in the array must be a class, string, or symbol. Strings and
+symbols will be camelized and constantized.
 
 ```ruby
-config.action_mailer.observers = ["MailObserver"]
+config.action_mailer.observers = [ "MailObserver" ]
 ```
+
+[`Mail::Message`]: https://api.rubyonrails.org/classes/Mail/Message.html
 
 #### `config.action_mailer.interceptors`
 
-Registers interceptors which will be called before mail is sent.
+Registers an array of [interceptors](action_mailer_basics.html#intercepting-emails)
+which will be called before mail is delivered. This allows you to make
+modifications to the email before it hits the delivery agents.
+
+The elements in the array must be a class, string, or symbol.
+Strings and symbols will be camelized and constantized.
 
 ```ruby
-config.action_mailer.interceptors = ["MailInterceptor"]
+config.action_mailer.interceptors = [ "MailInterceptor" ]
 ```
 
 #### `config.action_mailer.preview_interceptors`
 
-Registers interceptors which will be called before mail is previewed.
+Registers an array of interceptors which will be called before
+a mail is previewed. The elements in the array must be a class, string,
+or symbol. Strings and symbols will be camelized and constantized.
+
+The interceptor classes must implement the `previewing_email(message)`
+method, which will receive a [`Mail::Message`][] object.
 
 ```ruby
 config.action_mailer.preview_interceptors = ["MyPreviewMailInterceptor"]
@@ -3828,7 +4045,8 @@ config.action_mailer.preview_interceptors = ["MyPreviewMailInterceptor"]
 
 #### `config.action_mailer.preview_paths`
 
-Specifies the locations of mailer previews. Appending paths to this configuration option will cause those paths to be used in the search for mailer previews.
+Specifies the file paths which will be searched for
+[mailer previews](action_mailer_basics.html#previewing-emails).
 
 ```ruby
 config.action_mailer.preview_paths << "#{Rails.root}/lib/mailer_previews"
@@ -3836,68 +4054,75 @@ config.action_mailer.preview_paths << "#{Rails.root}/lib/mailer_previews"
 
 #### `config.action_mailer.show_previews`
 
-Enable or disable mailer previews. By default this is `true` in development.
+A boolean flag controlling whether mailers can be previewed.
 
-```ruby
-config.action_mailer.show_previews = false
-```
+When unset, it will be `true` in the `development` environment only.
 
 #### `config.action_mailer.perform_caching`
 
-Specifies whether the mailer templates should perform fragment caching or not. If it's not specified, the default will be `true`.
+A boolean flag controlling whether mailer templates should perform fragment caching.
+
+The default is `nil`, which will enable caching. The stock
+`config/environments/development.rb` file sets it to `false`.
 
 #### `config.action_mailer.deliver_later_queue_name`
 
-Specifies the Active Job queue to use for the default delivery job (see
-`config.action_mailer.delivery_job`). When this option is set to `nil`, delivery
-jobs are sent to the default Active Job queue (see
-[`config.active_job.default_queue_name`][]).
+Specifies the default Active Job queue to use for the
+[default mail delivery job](#config-action-mailer-delivery-job).
 
-Mailer classes can override this to use a different queue. Note that this only applies when using the default delivery job. If your mailer is using a custom job, its queue will be used.
+The default value is `nil`, which sends delivery jobs to the
+[default Active Job queue](#config-active-job-default-queue-name).
 
-Ensure that your Active Job adapter is also configured to process the specified queue, otherwise delivery jobs may be silently ignored.
+Mailer classes can override this to use a different queue.
 
-The default value depends on the `config.load_defaults` target version:
+Note that this option only applies when using the default delivery job.
+Custom job classes will specify their own queue.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:mailers`           |
-| 6.1                   | `nil`                |
+Ensure that your Active Job adapter is configured to process
+the specified queue, otherwise delivery jobs may be silently ignored.
 
 #### `config.action_mailer.delivery_job`
 
-Specifies delivery job for mail.
+Registers delivery job used to send mail.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `ActionMailer::MailDeliveryJob` |
-| 6.0                   | `"ActionMailer::MailDeliveryJob"` |
+The default value is `"ActionMailer::MailDeliveryJob"`.
 
 #### `config.action_mailer.raise_on_missing_callback_actions`
 
-Mirrors `config.action_controller.raise_on_missing_callback_actions`, but applies to mailers. Defaults to `false`.
+Mirrors [`config.action_controller.raise_on_missing_callback_actions`](#config-action-controller-raise-on-missing-callback-actions),
+but applies to mailers.
+
+The default is `false`.
 
 ### Configuring Active Support
 
-There are a few configuration options available in Active Support:
-
 #### `config.active_support.bare`
 
-Enables or disables the loading of `active_support/all` when booting Rails. Defaults to `nil`, which means `active_support/all` is loaded.
+A boolean flag that controls whether `active_support/all` is loaded when
+booting Rails.
+
+The default is `nil`, which loads `active_support/all`.
 
 #### `config.active_support.test_order`
 
-Sets the order in which the test cases are executed. Possible values are `:random` and `:sorted`. Defaults to `:random`.
+Sets the order in which test cases are executed.
+
+The default value is `:random`. Alternatively, it can be set to
+`:sorted`.
 
 #### `config.active_support.escape_html_entities_in_json`
 
-Enables or disables the escaping of HTML entities in JSON serialization. Defaults to `true`.
+A boolean which controls whether HTML entities are escaped during
+JSON serialization.
+
+Defaults to `true`.
 
 #### `config.active_support.use_standard_json_time_format`
 
-Enables or disables serializing dates to ISO 8601 format. Defaults to `true`.
+A boolean which, when enabled, serializes dates to ISO 8601 format
+in JSON.
+
+The default `true`.
 
 #### `config.active_support.time_precision`
 
@@ -3905,44 +4130,32 @@ Sets the precision of JSON encoded time values. Defaults to `3`.
 
 #### `config.active_support.hash_digest_class`
 
-Allows configuring the digest class to use to generate non-sensitive digests, such as the ETag header.
+Registers the digest class used to generate non-sensitive digests, such as
+the `ETag` header.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `OpenSSL::Digest::MD5` |
-| 5.2                   | `OpenSSL::Digest::SHA1` |
-| 7.0                   | `OpenSSL::Digest::SHA256` |
+The default value is `OpenSSL::Digest::SHA256`.
 
 #### `config.active_support.key_generator_hash_digest_class`
 
-Allows configuring the digest class to use to derive secrets from the configured secret base, such as for encrypted cookies.
+Configures the digest class to use to derive secrets from the
+secret key base, such as for encrypted cookies.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `OpenSSL::Digest::SHA1` |
-| 7.0                   | `OpenSSL::Digest::SHA256` |
+The default value is `OpenSSL::Digest::SHA256`.
 
 #### `config.active_support.use_authenticated_message_encryption`
 
-Specifies whether to use AES-256-GCM authenticated encryption as the default cipher for encrypting messages instead of AES-256-CBC.
+A boolean flag which controls whether `AES-256-GCM` is used as the default
+cipher (`true`) for encrypting messages, instead of the legacy `AES-256-CBC`.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 5.2                   | `true`               |
+The default value is `true`.
 
 #### `config.active_support.message_serializer`
 
 Specifies the default serializer used by [`ActiveSupport::MessageEncryptor`][]
-and [`ActiveSupport::MessageVerifier`][] instances. To make migrating between
-serializers easier, the provided serializers include a fallback mechanism to
-support multiple deserialization formats:
+and [`ActiveSupport::MessageVerifier`][].
+
+The accepted values are shown in the table below. All provided serializers
+have a fallback mechanism to simplify migration.
 
 | Serializer | Serialize and deserialize | Fallback deserialize |
 | ---------- | ------------------------- | -------------------- |
@@ -3951,6 +4164,8 @@ support multiple deserialization formats:
 | `:json_allow_marshal` | `ActiveSupport::JSON` | `ActiveSupport::MessagePack`, `Marshal` |
 | `:message_pack` | `ActiveSupport::MessagePack` | `ActiveSupport::JSON` |
 | `:message_pack_allow_marshal` | `ActiveSupport::MessagePack` | `ActiveSupport::JSON`, `Marshal` |
+
+The default value is `:json_allow_marshal`.
 
 WARNING: `Marshal` is a potential vector for deserialization attacks in cases
 where a message signing secret has been leaked. _If possible, choose a
@@ -3965,19 +4180,12 @@ Each of the above serializers will emit a [`message_serializer_fallback.active_s
 event notification when they fall back to an alternate deserialization format,
 allowing you to track how often such fallbacks occur.
 
-Alternatively, you can specify any serializer object that responds to `dump` and
-`load` methods. For example:
+You can also a custom serializer object that responds to `dump` and
+`load` methods:
 
 ```ruby
 config.active_support.message_serializer = YAML
 ```
-
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:marshal`           |
-| 7.1                   | `:json_allow_marshal` |
 
 [`ActiveSupport::MessageEncryptor`]: https://api.rubyonrails.org/classes/ActiveSupport/MessageEncryptor.html
 [`ActiveSupport::MessageVerifier`]: https://api.rubyonrails.org/classes/ActiveSupport/MessageVerifier.html
@@ -3985,162 +4193,196 @@ The default value depends on the `config.load_defaults` target version:
 
 #### `config.active_support.use_message_serializer_for_metadata`
 
-When `true`, enables a performance optimization that serializes message data and
-metadata together. This changes the message format, so messages serialized this
-way cannot be read by older (< 7.1) versions of Rails. However, messages that
+A boolean flag which, when `true`, enables a performance optimization
+in [`ActiveSupport::MessageEncryptor`][] and
+[`ActiveSupport::MessageVerifier`][] serializes message data and metadata
+together.
+
+This changes the message format, so messages serialized this
+way cannot be read by Rails versions older than v7.1. However, messages that
 use the old format can still be read, regardless of whether this optimization is
 enabled.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.1                   | `true`               |
+The default value is `true`.
 
 #### `config.active_support.cache_format_version`
 
-Specifies which serialization format to use for the cache. Possible values are
-`7.0`, and `7.1`.
+Specifies the serialization format to use for the cache.
 
-`7.0` serializes cache entries more efficiently.
+The accepted values are:
 
-`7.1` further improves efficiency, and allows expired and version-mismatched
-cache entries to be detected without deserializing their values. It also
-includes an optimization for bare string values such as view fragments.
+* `7.0`: serializes cache entries more efficiently.
+* `7.1`: further improves efficiency, and allows expired and version-mismatched
+  cache entries to be detected without deserializing their values. It also
+  includes an optimization for bare string values such as view fragments.
 
 All formats are backward and forward compatible, meaning cache entries written
 in one format can be read when using another format. This behavior makes it
 easy to migrate between formats without invalidating the entire cache.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| 7.0                   | `7.0`                |
-| 7.1                   | `7.1`                |
+The default value is `7.1`.
 
 #### `config.active_support.deprecation`
 
-Configures the behavior of deprecation warnings. See
-[`Deprecation::Behavior`][deprecation_behavior] for a description of the
-available options.
+Configures the strategy used by [`Deprecation::Behavior`][] to report deprecation
+warnings. This can be a single value, array, or an object that responds to `call`.
 
-In the default generated `config/environments` files, this is set to `:log` for
-development and `:stderr` for test, and it is omitted for production in favor of
+The available options are:
+
+| Value           | Behavior       |
+| --------------- | -------------- |
+| `:raise` | Raises [`ActiveSupport::DeprecationException`][] |
+| `:stderr` | Log all deprecation warnings to `$stderr`. |
+| `:log` | Log all deprecation warnings to `Rails.logger` |
+| `:notify` | Use [`ActiveSupport::Notifications`][] to notify `deprecation.rails`. |
+| `:report` | Use [`ActiveSupport::ErrorReporter`][] to report deprecations. |
+| `:silence` | Do nothing |
+
+In the stock `config/environments/development.rb` file, this option is set to `:log`, and
+in `config/environments/test.rb`, it is `:stderr`. In `production`, it is omitted in
+favor of
 [`config.active_support.report_deprecations`](#config-active-support-report-deprecations).
 
-[deprecation_behavior]: https://api.rubyonrails.org/classes/ActiveSupport/Deprecation/Behavior.html#method-i-behavior-3D
+When unset, it defaults to `:stderr`.
 
-#### `config.active_support.disallowed_deprecation`
-
-Configures the behavior of disallowed deprecation warnings. See
-[`Deprecation::Behavior`][deprecation_behavior] for a description of the
-available options.
-
-This option is intended for development and test. For production, favor
-[`config.active_support.report_deprecations`](#config-active-support-report-deprecations).
+[`Deprecation::Behavior`]: https://api.rubyonrails.org/classes/ActiveSupport/Deprecation/Behavior.html
+[`ActiveSupport::DeprecationException`]: https://api.rubyonrails.org/classes/ActiveSupport/DeprecationException.html
+[`ActiveSupport::Notifications`]: https://api.rubyonrails.org/classes/ActiveSupport/Notifications.html
+[`ActiveSupport::ErrorReporter`]: https://api.rubyonrails.org/classes/ActiveSupport/ErrorReporter.html
 
 #### `config.active_support.disallowed_deprecation_warnings`
 
-Configures deprecation warnings that the Application considers disallowed. This allows, for example, specific deprecations to be treated as hard failures.
+Defines the criteria used to identify deprecation messages which should
+be disallowed. This option can be an array containing strings, symbols, or
+regular expressions (symbols are treated as strings). These are compared
+against the text of the generated deprecation warning.
+
+All deprecations can be disallowed by setting this option to `:all`.
+
+Warnings matched by this option will be handled using the strategy set by
+[`config.active_support.disallowed_deprecation`](#config-active-support-disallowed-deprecation)
+
+#### `config.active_support.disallowed_deprecation`
+
+Configures how [`Deprecation::Behavior`][] handles
+[disallowed deprecation warnings](#config-active-support-disallowed-deprecation-warnings).
+It can be set to a single value, array, or an object that responds to `call`.
+
+The available options are:
+
+| Value           | Behavior       |
+| --------------- | -------------- |
+| `:raise` | Raises [`ActiveSupport::DeprecationException`][] |
+| `:stderr` | Log all deprecation warnings to `$stderr`. |
+| `:log` | Log all deprecation warnings to `Rails.logger` |
+| `:notify` | Use [`ActiveSupport::Notifications`][] to notify `deprecation.rails`. |
+| `:report` | Use [`ActiveSupport::ErrorReporter`][] to report deprecations. |
+| `:silence` | Do nothing |
+
+When unset, it defaults to `:raise`.
+
+This option is intended for the `development` and `test` environments.
+In production, favor
+[`config.active_support.report_deprecations`](#config-active-support-report-deprecations).
 
 #### `config.active_support.report_deprecations`
 
-When `false`, disables all deprecation warnings, including disallowed deprecations, from the [application’s deprecators](https://api.rubyonrails.org/classes/Rails/Application.html#method-i-deprecators). This includes all the deprecations from Rails and other gems that may add their deprecator to the collection of deprecators, but may not prevent all deprecation warnings emitted from ActiveSupport::Deprecation.
+A boolean flag which controls whether Rails should report deprecation warnings.
 
-In the default generated `config/environments` files, this is set to `false` for production.
+When `false`, all deprecation warnings including disallowed deprecations from
+your application, its gems, and from Rails will be silenced.
+
+However, it may not prevent all deprecation warnings emitted from
+[`ActiveSupport::Deprecation`](https://api.rubyonrails.org/classes/ActiveSupport/Deprecation.html).
+
+The default value is `nil`, which means deprecations will be reported. The stock
+`config/environments/production.rb` file sets it to `false`.
 
 #### `config.active_support.isolation_level`
 
-Configures the locality of most of Rails internal state. If you use a fiber based server or job processor (e.g. `falcon`), you should set it to `:fiber`. Otherwise it is best to use `:thread` locality. Defaults to `:thread`.
+Configures the isolation boundary for Rails' internal state. The default
+is `:thread`.
+
+When using a fiber-based server or job processor such as
+[Falcon](https://socketry.github.io/falcon/), change this option to `:fiber`.
 
 #### `config.active_support.executor_around_test_case`
 
-Configure the test suite to call `Rails.application.executor.wrap` around test cases.
-This makes test cases behave closer to an actual request or job.
-Several features that are normally disabled in test, such as Active Record query cache
-and asynchronous queries will then be enabled.
+A boolean which, when enabled, wraps all test cases around
+[`Rails.app.executor.wrap`](https://api.rubyonrails.org/classes/ActiveSupport/ExecutionWrapper.html#method-c-wrap).
 
-The default value depends on the `config.load_defaults` target version:
+This makes the behavior of test cases closer to an actual request or job.
+Several features usually disabled in tests, such as the Active Record query cache
+and asynchronous queries, will be enabled when wrapped in an executor.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.0                   | `true`               |
+The default value is `true`.
 
-#### `ActiveSupport::Logger.silencer`
+#### `Rails.logger.silencer`
 
-Is set to `false` to disable the ability to silence logging in a block. The default is `true`.
+Logs below a specific level can be silenced within the scope of a block
+using [`Rails.logger.silence`](https://api.rubyonrails.org/classes/ActiveSupport/LoggerSilence.html#method-i-silence). This option is a boolean flag which controls whether this
+silencer is enabled.
+
+The default is `true`.
 
 #### `ActiveSupport::Cache::Store.logger`
 
-Specifies the logger to use within cache store operations.
+Registers the logger for use within cache store operations.
 
 #### `ActiveSupport.utc_to_local_returns_utc_offset_times`
 
-Configures [`ActiveSupport::TimeZone.utc_to_local`][] to return a time with a UTC
-offset instead of a UTC time incorporating that offset.
+A boolean value which controls whether
+[`ActiveSupport::TimeZone.utc_to_local`][] returns a time with
+a UTC offset (`true`) or a UTC time incorporating that offset (`false`).
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 6.1                   | `true`               |
+The default value is `true`.
 
 [`ActiveSupport::TimeZone.utc_to_local`]: https://api.rubyonrails.org/classes/ActiveSupport/TimeZone.html#method-i-utc_to_local
 
 #### `config.active_support.raise_on_invalid_cache_expiration_time`
 
-Specifies whether an `ArgumentError` should be raised if `Rails.cache`
+A boolean flag which, when enabled, raises an `ArgumentError` when `Rails.cache`
 [`fetch`][ActiveSupport::Cache::Store#fetch] or [`write`][ActiveSupport::Cache::Store#write]
-are given an invalid `expires_at` or `expires_in` time.
+are supplied an invalid `expires_at` or `expires_in` time.
 
-Options are `true` and `false`. If `false`, the exception will be reported
-as `handled` and logged instead.
+If disabled, the exception will be reported as `handled`
+and logged instead.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.1                   | `true`               |
+The default value is `true`.
 
 [ActiveSupport::Cache::Store#fetch]: https://api.rubyonrails.org/classes/ActiveSupport/Cache/Store.html#method-i-fetch
 [ActiveSupport::Cache::Store#write]: https://api.rubyonrails.org/classes/ActiveSupport/Cache/Store.html#method-i-write
 
 #### `ActiveSupport.raise_on_invalid_time_zone_parse`
 
-Specifies whether [`ActiveSupport::TimeZone#parse`][] raises `ArgumentError`
-for strings that contain no recognizable date information (e.g. `"foobar"`).
+A boolean flag which controls whether [`ActiveSupport::TimeZone#parse`][]
+raises an `ArgumentError` when passed a string that:
 
-Historically, `TimeZone#parse` had two different behaviors for invalid
-strings: it returned `nil` when the string contained no recognizable date
-information, but raised `ArgumentError` when the string looked like a date
-but contained out-of-range values (e.g. `"9000"`, which is interpreted as
-month 90).
+* contains no recognizable date information, such as `"foobar"`
 
-When set to `true`, both cases raise `ArgumentError`, which matches the
-Ruby standard library's `Time.parse` and makes failures less likely to
-go unnoticed.
+or
 
-The default value depends on the `config.load_defaults` target version:
+* appears to be dates but are out-of-range, such as `"9000"`,
+  which would be interpreted as _month 90_.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 8.2                   | `true`               |
+When `false`, out-of-range strings will still raise an `ArgumentError`, but
+strings that contain no recognizable date information will return `nil`.
+
+The default value is `true`.
 
 [`ActiveSupport::TimeZone#parse`]: https://api.rubyonrails.org/classes/ActiveSupport/TimeZone.html#method-i-parse
 
 #### `config.active_support.event_reporter_context_store`
 
-Configures a custom context store for the Event Reporter. The context store is used to manage metadata that should be attached to every event emitted by the reporter.
+Registers a custom context store for the [Event Reporter](https://api.rubyonrails.org/classes/ActiveSupport/EventReporter.html).
+The context store is used to manage metadata that should be attached to every
+event emitted by the reporter.
 
-By default, the Event Reporter uses `ActiveSupport::EventContext` which stores context in fiber-local storage.
+By default, the Event Reporter uses `ActiveSupport::EventContext` which
+stores context in fiber-local storage.
 
-To use a custom context store, set this config to a class that implements the context store interface:
+A custom context may be used, as long it as it implements the context
+store interface as shown below:
 
 ```ruby
 # config/application.rb
@@ -4163,54 +4405,53 @@ class CustomContextStore
 end
 ```
 
-Defaults to `nil`, which means the default `ActiveSupport::EventContext` store is used.
+The default is `nil`, which means that `ActiveSupport::EventContext`
+store is used.
 
 #### `config.active_support.escape_js_separators_in_json`
 
-Specifies whether LINE SEPARATOR (U+2028) and PARAGRAPH SEPARATOR (U+2029) are escaped when generating JSON.
+Specifies whether `LINE SEPARATOR (U+2028)` and `PARAGRAPH SEPARATOR (U+2029)`
+characters are escaped when generating JSON.
 
-Historically these characters were not valid inside JavaScript literal strings but that changed in ECMAScript 2019.
+Historically, these characters were not valid inside JavaScript literal
+strings but that changed in ECMAScript 2019.
+
 As such it's no longer a concern in modern browsers: https://caniuse.com/mdn-javascript_builtins_json_json_superset.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `true`               |
-| 8.1                   | `false`              |
+The default value is `false`.
 
 ### Configuring Active Job
 
-`config.active_job` provides the following configuration options:
-
 #### `config.active_job.queue_adapter`
 
-Sets the adapter for the queuing backend. The default adapter is `:async`. For an up-to-date list of built-in adapters see the [ActiveJob::QueueAdapters API documentation](https://api.rubyonrails.org/classes/ActiveJob/QueueAdapters.html).
+Sets the adapter for the queuing backend. The default adapter is `:async`.
 
-```ruby
-# Be sure to have the adapter's gem in your Gemfile
-# and follow the adapter's specific installation
-# and deployment instructions.
-config.active_job.queue_adapter = :solid_queue
-```
+The list of built-in adapters can be found in the
+[API documentation](https://api.rubyonrails.org/classes/ActiveJob/QueueAdapters.html).
+
+Rails installs the [Solid Queue](https://github.com/rails/solid_queue/) gem by default,
+and the stock `config/environments/production.rb` file configures it as the queue
+adapter.
 
 #### `config.active_job.default_queue_name`
 
-Can be used to change the default queue name. By default this is `"default"`.
+Sets the default queue name. When unset, it is `"default"`.
 
 ```ruby
 config.active_job.default_queue_name = :medium_priority
 ```
 
-[`config.active_job.default_queue_name`]: #config-active-job-default-queue-name
-
 #### `config.active_job.queue_name_prefix`
 
-Allows you to set an optional, non-blank, queue name prefix for all jobs. By default it is blank and not used.
+Sets a prefix which will be appended to the queue name within jobs. It is blank
+by default.
 
-The following configuration would queue the given job on the `production_high_priority` queue when run in production:
+The following configuration would queue the given job on the
+`production_high_priority` queue when run in production:
 
 ```ruby
+# config/environments/production.rb
+
 config.active_job.queue_name_prefix = Rails.env
 ```
 
@@ -4223,9 +4464,13 @@ end
 
 #### `config.active_job.queue_name_delimiter`
 
-Has a default value of `'_'`. If `queue_name_prefix` is set, then `queue_name_delimiter` joins the prefix and the non-prefixed queue name.
+When [`config.active_job.queue_name_prefix`](#config-active-job-queue-name-prefix)
+is set, this option is used to join the prefix with the queue name.
 
-The following configuration would queue the provided job on the `video_server.low_priority` queue:
+The default value is `"_"`.
+
+The following configuration would queue the job on the
+`video_server.low_priority` queue:
 
 ```ruby
 # prefix must be set for delimiter to be used
@@ -4242,16 +4487,27 @@ end
 
 #### `config.active_job.logger`
 
-Accepts a logger conforming to the interface of Log4r or the default Ruby Logger class, which is then used to log information from Active Job. You can retrieve this logger by calling `logger` on either an Active Job class or an Active Job instance. Set to `nil` to disable logging.
+Registers a logger conforming to the interface of Log4r or the
+default Ruby `Logger` class.
+
+Defaults to [`config.logger`](#config-logger).
+
+Set this option to `nil` to disable logging.
 
 #### `config.active_job.custom_serializers`
 
-Allows to set custom argument serializers. Defaults to `[]`.
+Registers an array of
+[custom argument serializers](active_job_basics.html#add-custom-types-by-defining-serializers).
+
+Defaults to `[]`.
 
 #### `config.active_job.enqueue_after_transaction_commit`
 
-Controls whether jobs enqueued inside an Active Record transaction are deferred
-until after the transaction commits. When false, jobs are enqueued immediately.
+A boolean controlling whether jobs enqueued inside an Active Record
+transaction are deferred until after the transaction commits.
+
+When `false`, jobs are enqueued immediately.
+
 Individual jobs can override the global setting:
 
 ```ruby
@@ -4260,106 +4516,121 @@ class NotificationJob < ApplicationJob
 end
 ```
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 8.2                   | `true`               |
+The default value is `true`.
 
 #### `config.active_job.log_arguments`
 
-Controls if the arguments of a job are logged. Defaults to `true`.
+A boolean flag which, when enabled, logs the arguments passed to a job.
+
+Defaults to `true`.
 
 #### `config.active_job.verbose_enqueue_logs`
 
-Specifies if source locations of methods that enqueue background jobs should be logged below relevant enqueue log lines. By default, the flag is `true` in development and `false` in all other environments.
+A boolean flag which determines whether the source locations
+of methods that enqueue background jobs are logged below relevant enqueue
+log lines.
+
+The default value is `false`, but the stock `config/environments/development.rb`
+sets it to `true`.
 
 #### `config.active_job.retry_jitter`
 
-Controls the amount of "jitter" (random variation) applied to the delay time calculated when retrying failed jobs.
+Sets the amount of _jitter_ (random variation) applied to the delay time
+calculated when retrying failed jobs.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `0.0`                |
-| 6.1                   | `0.15`               |
+The default value is `0.15`.
 
 #### `config.active_job.log_query_tags_around_perform`
 
-Determines whether job context for query tags will be automatically updated via
-an `around_perform`. The default value is `true`.
+A boolean which determines whether the job context for query tags
+will be automatically updated via an `around_perform`.
+
+The default value is `true`.
 
 ### Configuring Action Cable
 
 #### `config.action_cable.url`
 
-Accepts a string for the URL for where you are hosting your Action Cable
-server. You would use this option if you are running Action Cable servers that
-are separated from your main application.
+Configures the URL for the Action Cable server, specified as a string.
+
+Use this option when running stand-alone Action Cable servers.
 
 #### `config.action_cable.mount_path`
 
-Accepts a string for where to mount Action Cable, as part of the main server
-process. Defaults to `/cable`. You can set this as nil to not mount Action
-Cable as part of your normal Rails server.
+Sets the path where Action Cable will be mounted in the main server
+process. The default is `"/cable"`.
+
+Seting this to `nil` will not mount Action Cable as part of
+your Rails server.
 
 You can find more detailed configuration options in the
 [Action Cable Overview](action_cable_overview.html#configuration).
 
 #### `config.action_cable.precompile_assets`
 
-Determines whether the Action Cable assets should be added to the asset pipeline precompilation. It
-has no effect if Sprockets is not used. The default value is `true`.
+Determines whether the Action Cable assets should be added
+to the asset pipeline precompilation.
+
+It has no effect when Sprockets is not used.
+
+The default value is `true`.
 
 #### `config.action_cable.allow_same_origin_as_host`
 
-Determines whether an origin matching the cable server itself will be permitted.
+A boolean which determines whether an origin matching the
+cable server itself will be permitted.
+
 The default value is `true`.
 
-Set to false to disable automatic access for same-origin requests, and strictly allow
-only the configured origins.
+Set to `false` to disable automatic access for `same-origin` requests, and
+strictly allow only the [configured origins](#config-action-cable-allowed-request-origins).
 
 #### `config.action_cable.allowed_request_origins`
 
-Determines the request origins which will be accepted by the cable server.
-The default value is `/https?:\/\/localhost:\d+/` in the `development` environment.
+Configures the request origins which will be accepted by the cable server.
+The value can be a string, regular expression, or an array containing either
+of those types.
+
+The default value in `development` is `/https?:\/\/localhost:\d+/`. It is
+unset in all other environments.
 
 ### Configuring Active Storage
 
-`config.active_storage` provides the following configuration options:
-
 #### `config.active_storage.variant_processor`
 
-Accepts a symbol `:mini_magick`, `:vips`, or `:disabled` specifying whether or not variant
-processing and blob analysis will be performed with MiniMagick or ruby-vips.
+Registers the processor used to build [variants](active_storage_overview.html#image-variants)
+of uploaded blobs.
 
-It also accepts a class. The class must implement the interface defined by
-`ActiveStorage::Transformers::Transformer`. Active Storage then uses it for variant processing:
+The accepted values are:
+
+* `:mini_magick`: Uses the [`MiniMagick`](https://github.com/minimagick/minimagick) gem.
+* `:vips`: Uses the [`ruby-vips`](https://github.com/libvips/ruby-vips) gem.
+* `:disabled`: Turns off variant processing.
+
+A custom class which implements the interface defined
+by [`ActiveStorage::Transformers::Transformer`][] may also be specified.
 
 ```ruby
 config.active_storage.variant_processor = CustomTransformer
 ```
 
-Note that the built-in image analyzers accept a blob only when `variant_processor` is `:vips` or
-`:mini_magick`, so setting this configuration to a custom class requires adding a custom analyzer to
+The default value is `:vips`.
+
+NOTE: The built-in image analyzers accept a blob only when
+`variant_processor` is `:vips` or `:mini_magick`. When using a custom
+processor add a custom analyzer to
 [`config.active_storage.analyzers`](#config-active-storage-analyzers) as well.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:mini_magick`       |
-| 7.0                   | `:vips`              |
+[`ActiveStorage::Transformers::Transformer`]: https://api.rubyonrails.org/classes/ActiveStorage/Transformers/Transformer.html
 
 #### `config.active_storage.analyzers`
 
-Accepts an array of classes indicating the analyzers available for Active Storage blobs.
-By default, this is defined as:
+Registers an array of analyzers available for Active Storage blobs.
+
+The default is:
 
 ```ruby
-config.active_storage.analyzers = [
+[
   ActiveStorage::Analyzer::ImageAnalyzer::Vips,
   ActiveStorage::Analyzer::ImageAnalyzer::ImageMagick,
   ActiveStorage::Analyzer::VideoAnalyzer,
@@ -4367,9 +4638,15 @@ config.active_storage.analyzers = [
 ]
 ```
 
-The image analyzers can extract width and height of an image blob; the video analyzer can extract width, height, duration, angle, aspect ratio, and presence/absence of video/audio channels of a video blob; the audio analyzer can extract duration and bit rate of an audio blob.
+The image analyzers can extract width and height of an image blob.
 
-If you want to disable analyzers, you can set this to an empty array:
+The video analyzer can extract width, height, duration, angle,
+aspect ratio, and detect the presence of video or audio channels of a
+video blob.
+
+The audio analyzer can extract the duration and bit rate of an audio blob.
+
+Disable analyzers by setting this to an empty array:
 
 ```ruby
 config.active_storage.analyzers = []
@@ -4379,9 +4656,11 @@ config.active_storage.analyzers = []
 
 Controls when attachment analysis (image/video/audio metadata extraction) is performed:
 
-* `:immediately` - Analyze before validation, making metadata available for validations (e.g. image dimensions, video duration)
-* `:later` - Analyze after upload from local IO or via background job for direct uploads
-* `:lazily` - Skip automatic analysis; analyze on-demand
+* `:immediately`: Analyze before validation, making metadata available
+  for validations (for example: image dimensions, video duration).
+* `:later`: Analyze after upload from local IO or via background job for
+  direct uploads.
+* `:lazily`: Skip automatic analysis and analyze on-demand.
 
 When set to `:immediately`, you can validate file properties in model validations:
 
@@ -4399,31 +4678,41 @@ class User < ApplicationRecord
 end
 ```
 
-Attachments with `process: :immediately` variants implicitly use immediate analysis to ensure metadata is available before processing.
+Attachments with `process: :immediately` variants implicitly use
+immediate analysis to ensure metadata is available before processing.
 
-NOTE: Direct uploads bypass the server so the file isn't locally available for analysis. In this case, `:immediately` falls back to `:later`, analyzing via background job after upload completes. Metadata isn't available for validation.
+NOTE: Direct uploads bypass the server so the file isn't locally available
+for analysis. In this case, `:immediately` falls back to `:later`, analyzing
+via background job after upload completes. Metadata isn't available for validation.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `:later`             |
-| 8.2                   | `:immediately`       |
+The default value is `:immediately`.
 
 #### `config.active_storage.previewers`
 
-Accepts an array of classes indicating the image previewers available in Active Storage blobs.
-By default, this is defined as:
+Registers an array of image previewers available for Active Storage blobs.
+
+The default is:
 
 ```ruby
-config.active_storage.previewers = [ActiveStorage::Previewer::PopplerPDFPreviewer, ActiveStorage::Previewer::MuPDFPreviewer, ActiveStorage::Previewer::VideoPreviewer]
+[
+  ActiveStorage::Previewer::PopplerPDFPreviewer,
+  ActiveStorage::Previewer::MuPDFPreviewer,
+  ActiveStorage::Previewer::VideoPreviewer
+]
 ```
 
-`PopplerPDFPreviewer` and `MuPDFPreviewer` can generate a thumbnail from the first page of a PDF blob; `VideoPreviewer` from the relevant frame of a video blob.
+`PopplerPDFPreviewer` and `MuPDFPreviewer` can generate a thumbnail from
+the first page of a PDF blob. `VideoPreviewer` generates a thumbnail from a
+_relevant_ frame of a video blob.
 
 #### `config.active_storage.paths`
 
-Accepts a hash of options indicating the locations of previewer/analyzer commands. The default is `{}`, meaning the commands will be looked for in the default path. Can include any of these options:
+A hash of options defining the paths to the external binaries used
+by previewers and analyzers such as `ffmpeg`.
+
+The default is `{}`, meaning the commands will be looked for in the default path.
+
+Any of these options may be included:
 
 * `:ffprobe` - The location of the ffprobe executable.
 * `:mutool` - The location of the mutool executable.
@@ -4435,103 +4724,133 @@ config.active_storage.paths[:ffprobe] = "/usr/local/bin/ffprobe"
 
 #### `config.active_storage.variable_content_types`
 
-Accepts an array of strings indicating the content types that Active Storage
-can transform through the variant processor.
-By default, this is defined as:
+Registers an array of MIME types that Active Storage can
+transform using the variant processor.
+
+The default value is:
 
 ```ruby
-config.active_storage.variable_content_types = %w(image/png image/gif image/jpeg image/tiff image/bmp image/vnd.adobe.photoshop image/vnd.microsoft.icon image/webp image/avif image/heic image/heif)
+[
+  "image/png", "image/gif", "image/jpeg", "image/tiff", "image/bmp",
+  "image/vnd.adobe.photoshop", "image/vnd.microsoft.icon",
+  "image/webp", "image/avif", "image/heic", "image/heif"
+]
 ```
 
 #### `config.active_storage.web_image_content_types`
 
-Accepts an array of strings regarded as web image content types in which
-variants can be processed without being converted to the fallback PNG format.
+Registers an array of MIME types which are regarded as web image content
+types. Variants of these types can be processed without being converted to the
+fallback PNG format.
+
 For example, if you want to use `AVIF` variants in your application you can add
 `image/avif` to this array.
 
-The default value depends on the `config.load_defaults` target version:
+The default value is:
 
-| Starting with version | The default value is                            |
-| --------------------- | ----------------------------------------------- |
-| (original)            | `%w(image/png image/jpeg image/gif)`            |
-| 7.2                   | `%w(image/png image/jpeg image/gif image/webp)` |
+```ruby
+[
+  "image/png",
+  "image/gif",
+  "image/webp"
+]
+```
 
 #### `config.active_storage.content_types_to_serve_as_binary`
 
-Accepts an array of strings indicating the content types that Active Storage will always serve as an attachment, rather than inline.
-By default, this is defined as:
+Registers an array of MIME types that Active Storage will always serve as an
+attachment, rather than inline.
+
+The default value is:
 
 ```ruby
-config.active_storage.content_types_to_serve_as_binary = %w(text/html image/svg+xml application/postscript application/x-shockwave-flash text/xml application/xml application/xhtml+xml application/mathml+xml text/cache-manifest)
+[
+  "text/html",
+  "image/svg+xml",
+  "application/postscript",
+  "application/x-shockwave-flash",
+  "text/xml",
+  "application/xml",
+  "application/xhtml+xml",
+  "application/mathml+xml",
+  "text/cache-manifest"
+]
 ```
 
 #### `config.active_storage.content_types_allowed_inline`
 
-Accepts an array of strings indicating the content types that Active Storage allows to serve as inline.
-By default, this is defined as:
+Registers an array of MIME types that Active Storage will serve as inline.
+
+The default value is:
 
 ```ruby
-config.active_storage.content_types_allowed_inline = %w(image/webp image/avif image/png image/gif image/jpeg image/tiff image/vnd.adobe.photoshop image/vnd.microsoft.icon application/pdf)
+[
+  "image/webp", "image/avif", "image/png",
+  "image/gif", "image/jpeg", "image/tiff", "image/bmp",
+  "image/vnd.adobe.photoshop", "image/vnd.microsoft.icon",
+  "application/pdf"
+]
 ```
 
 #### `config.active_storage.queues.analysis`
 
-Accepts a symbol indicating the Active Job queue to use for analysis jobs. When
-this option is `nil`, analysis jobs are sent to the default Active Job queue
-(see [`config.active_job.default_queue_name`][]).
+Sets the Active Job queue to use for analysis jobs.
 
-The default value depends on the `config.load_defaults` target version:
+When `nil`, analysis jobs are sent to the
+[default Active Job queue](#config-active-job-default-queue-name).
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| 6.0                   | `:active_storage_analysis` |
-| 6.1                   | `nil`                |
+The default value is `nil`.
 
 #### `config.active_storage.queues.mirror`
 
-Accepts a symbol indicating the Active Job queue to use for direct upload
-mirroring jobs. When this option is `nil`, mirroring jobs are sent to the
-default Active Job queue (see [`config.active_job.default_queue_name`][]). The
-default is `nil`.
+Sets the Active Job queue to use for direct upload mirroring jobs.
+
+When `nil`, mirroring jobs are sent to the
+[default Active Job queue](#config-active-job-default-queue-name).
+
+The default is `nil`.
 
 #### `config.active_storage.queues.preview_image`
 
-Accepts a symbol indicating the Active Job queue to use for preprocessing
-previews of images. When this option is `nil`, jobs are sent to the default
-Active Job queue (see [`config.active_job.default_queue_name`][]). The default
-is `nil`.
+Sets the Active Job queue to use for preprocessing
+previews of images.
+
+When `nil`, preprocessing jobs are sent to the
+[default Active Job queue](#config-active-job-default-queue-name).
+
+The default is `nil`.
 
 #### `config.active_storage.queues.purge`
 
-Accepts a symbol indicating the Active Job queue to use for purge jobs. When
-this option is `nil`, purge jobs are sent to the default Active Job queue (see
-[`config.active_job.default_queue_name`][]).
+Sets the Active Job queue to use for purge jobs.
 
-The default value depends on the `config.load_defaults` target version:
+When `nil`, purge jobs are sent to the
+[default Active Job queue](#config-active-job-default-queue-name).
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| 6.0                   | `:active_storage_purge` |
-| 6.1                   | `nil`                |
+The default is `nil`.
 
 #### `config.active_storage.queues.transform`
 
-Accepts a symbol indicating the Active Job queue to use for preprocessing
-variants. When this option is `nil`, jobs are sent to the default Active Job
-queue (see [`config.active_job.default_queue_name`][]). The default is `nil`.
+Sets the Active Job queue to use for preprocessing
+variants.
+
+When `nil`, preprocessing jobs are sent to the
+[default Active Job queue](#config-active-job-default-queue-name).
+
+The default is `nil`.
 
 #### `config.active_storage.logger`
 
-Can be used to set the logger used by Active Storage. Accepts a logger conforming to the interface of Log4r or the default Ruby Logger class.
+Registers a logger for Active Storage, conforming to the interface of `Log4r` or
+the default Ruby `Logger` class.
 
-```ruby
-config.active_storage.logger = ActiveSupport::Logger.new(STDOUT)
-```
+Defaults to `config.logger`.
+
+Setting this option to `false` will turn off logs for Active Storage.
 
 #### `config.active_storage.service_urls_expire_in`
 
-Determines the default expiry of URLs generated by:
+Configures the default expiry of URLs generated by:
 
 * [`ActiveStorage::Blob#url`][]
 * [`ActiveStorage::Blob#service_url_for_direct_upload`][]
@@ -4547,48 +4866,47 @@ The default is 5 minutes.
 
 #### `config.active_storage.urls_expire_in`
 
-Determines the default expiry of URLs in the Rails application generated by Active Storage. The default is nil.
+Configures the default expiry of URLs in the Rails application
+generated by Active Storage. The default is nil.
 
 #### `config.active_storage.touch_attachment_records`
 
-Directs ActiveStorage::Attachments to touch its corresponding record when updated. The default is true.
+A boolean flag which, when enabled, will `touch` the parent record
+when an attachment is updated.
+
+The default is `true`.
 
 #### `config.active_storage.routes_prefix`
 
-Can be used to set the route prefix for the routes served by Active Storage.
+Sets the route prefix for the routes served by Active Storage.
+
 Accepts any value supported by `scope`, such as a string path prefix or a hash of
 routing options.
 
-```ruby
-config.active_storage.routes_prefix = "/files"
-```
+The default is `"/rails/active_storage"`.
 
-For example, to serve the Active Storage routes from a specific subdomain:
+The below example demonstrates how Active Storage routes can be served
+from a different subdomain.
 
 ```ruby
 config.active_storage.routes_prefix = { path: "/files", subdomain: "assets" }
 ```
 
-The default is `/rails/active_storage`.
-
 #### `config.active_storage.track_variants`
 
-Determines whether variants are recorded in the database.
+A boolean which determines whether variants are recorded in the database.
 
-The default value depends on the `config.load_defaults` target version:
-
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 6.1                   | `true`               |
+The default value is `true`.
 
 #### `config.active_storage.draw_routes`
 
-Can be used to toggle Active Storage route generation. The default is `true`.
+A boolean used to toggle whether Active Storage routes are generated.
+
+The default is `true`.
 
 #### `config.active_storage.resolve_model_to_route`
 
-Can be used to globally change how Active Storage files are delivered.
+Sets the delivery mechanism for Active Storage files.
 
 Allowed values are:
 
@@ -4599,20 +4917,29 @@ The default is `:rails_storage_redirect`.
 
 #### `config.active_storage.video_preview_arguments`
 
-Can be used to alter the way ffmpeg generates video preview images.
+Sets the arguments passed to `ffmpeg` when generating video previews:
 
-The default value depends on the `config.load_defaults` target version:
+The default value is
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `"-y -vframes 1 -f image2"` |
-| 7.0                   | `"-vf 'select=eq(n\\,0)+eq(key\\,1)+gt(scene\\,0.015)"`<sup><mark><strong><em>1</em></strong></mark></sup> <br> `+ ",loop=loop=-1:size=2,trim=start_frame=1'"`<sup><mark><strong><em>2</em></strong></mark></sup><br> `+ " -frames:v 1 -f image2"` <br><br> <ol><li>Select the first video frame, plus keyframes, plus frames that meet the scene change threshold.</li> <li>Use the first video frame as a fallback when no other frames meet the criteria by looping the first (one or) two selected frames, then dropping the first looped frame.</li></ol> |
+```ruby
+"-vf 'select=eq(n\\,0)+eq(key\\,1)+gt(scene\\,0.015),loop=loop=-1:size=2,trim=start_frame=1' -frames:v 1 -f image2"
+```
+
+`-vf 'select=eq(n\\,0)+eq(key\\,1)+gt(scene\\,0.015)"` select the first video frame,
+plus keyframes, plus frames that meet the scene change threshold.
+
+`loop=loop=-1:size=2,trim=start_frame=1'` uses the first video frame as a
+fallback when no other frames meet the criteria by looping the first
+(one or) two selected frames, then dropping the first looped frame.
 
 #### `config.active_storage.video_preview_input_arguments`
 
-Arguments passed to ffmpeg before `-i` when generating video preview images.
-ffmpeg's flags are position dependent, so arguments that apply to the input,
-such as `-codec_whitelist` and `-protocol_whitelist`, belong here.
+Configures the arguments passed to `ffmpeg` before `-i` when
+generating video preview images.
+
+`ffmpeg`'s flags are position dependent, so use this option to define
+arguments that apply to the input such as `-codec_whitelist` and
+`-protocol_whitelist`.
 
 The default value is `""`.
 
@@ -4621,10 +4948,11 @@ in the Security Guide.
 
 #### `config.active_storage.ffprobe_arguments`
 
-Arguments passed to ffprobe before the file path when analyzing videos and
-audio. Applies to both `ActiveStorage::Analyzer::VideoAnalyzer` and
-`ActiveStorage::Analyzer::AudioAnalyzer`. Arguments that make ffprobe reject a
-file will fail that file's analysis.
+Defines the arguments passed to `ffprobe` before the file path when analyzing
+videos and audio. Applies to both `ActiveStorage::Analyzer::VideoAnalyzer` and
+`ActiveStorage::Analyzer::AudioAnalyzer`.
+
+Arguments that make `ffprobe` reject a file will fail that file's analysis.
 
 The default value is `""`.
 
@@ -4633,6 +4961,7 @@ in the Security Guide.
 
 #### `config.active_storage.multiple_file_field_include_hidden`
 
+TODO continue
 In Rails 7.1 and beyond, Active Storage `has_many_attached` relationships will
 default to _replacing_ the current collection instead of _appending_ to it. Thus
 to support submitting an _empty_ collection, when `multiple_file_field_include_hidden`
@@ -4641,7 +4970,7 @@ helper will render an auxiliary hidden field, similar to the auxiliary field
 rendered by the [`checkbox`](https://api.rubyonrails.org/classes/ActionView/Helpers/FormBuilder.html#method-i-checkbox)
 helper.
 
-The default value depends on the `config.load_defaults` target version:
+The default value is `true`
 
 | Starting with version | The default value is |
 | --------------------- | -------------------- |
