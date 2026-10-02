@@ -2076,6 +2076,10 @@ each one takes longer to complete.
 The default value is `nil`, meaning all dependent records for an association
 will be destroyed in a single background job.
 
+#### `config.active_record.disable_prepared_statements`
+
+A boolean which, when set to `true` disables SQL _prepared statements_.
+
 #### `config.active_record.queues.destroy`
 
 Sets the Active Job queue in which to enqueue jobs to destroy records.
@@ -2170,7 +2174,7 @@ If prepared statements are desired in conjunction with `query_log_tags`
 you must explicitly enable them:
 
 ```ruby
-config.active_record.disable_preprared_statments = false
+config.active_record.disable_prepared_statements = false
 ```
 
 NOTE: High cardinality comments can cause degraded performance
@@ -3777,8 +3781,8 @@ Configures the HTML sanitizer used by Action View.
 
 The default value is `Rails::HTML5::Sanitizer`.
 
-NOTE: `Rails::HTML5::Sanitizer` is not supported on JRuby, so on
-JRuby platforms Rails will fall back to `Rails::HTML4::Sanitizer`.
+NOTE: Rails will back back to `Rails::HTML4::Sanitizer` when running on
+JRuby platforms, as `Rails::HTML5::Sanitizer` is not supported.
 
 #### `config.action_view.remove_hidden_field_autocomplete`
 
@@ -4961,40 +4965,39 @@ in the Security Guide.
 
 #### `config.active_storage.multiple_file_field_include_hidden`
 
-TODO continue
-In Rails 7.1 and beyond, Active Storage `has_many_attached` relationships will
-default to _replacing_ the current collection instead of _appending_ to it. Thus
-to support submitting an _empty_ collection, when `multiple_file_field_include_hidden`
-is `true`, the [`file_field`](https://api.rubyonrails.org/classes/ActionView/Helpers/FormBuilder.html#method-i-file_field)
-helper will render an auxiliary hidden field, similar to the auxiliary field
-rendered by the [`checkbox`](https://api.rubyonrails.org/classes/ActionView/Helpers/FormBuilder.html#method-i-checkbox)
-helper.
+When an Active Storage [`has_many_attached`][] relationship is modified, the
+current collection is _replaced_ by the new value.
 
-The default value is `true`
+This option controls whether the [`file_field`][] helper renders an auxillary
+hidden field containing an empty collection of attachments.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `false`              |
-| 7.0                   | `true`               |
+It is enabled by default. Submitting a form with the hidden field generated
+by this option will remove all currently attached files. To retain the existing
+files, either the hidden field needs to be omitted altogether, or the file
+attributes need to be resubmitted with the form.
+
+[`has_many_attached`]: https://api.rubyonrails.org/classes/ActiveStorage/Attached/Model.html#method-i-has_many_attached
+[`file_field`]: https://api.rubyonrails.org/classes/ActionView/Helpers/FormBuilder.html#method-i-file_field
 
 #### `config.active_storage.precompile_assets`
 
-Determines whether the Active Storage assets should be added to the asset pipeline precompilation. It
-has no effect if Sprockets is not used. The default value is `true`.
+Determines whether the Active Storage assets should be precompiled by the
+asset pipeline. It has no effect where Sprockets isn't used.
+
+The default value is `true`.
 
 #### `config.active_storage.streaming_max_ranges`
 
-Defines how many ranges a byte range request may contain.
+[`ActiveStorage::Streaming`][] allows partial resources to be requested using
+[HTTP Range Requests][], but this can be abused for denial of service attacks.
 
-`ActiveStorage::Streaming` allows requesting partial resources using HTTP Range Requests,
-but that feature can be abused for denial of service attacks.
+This option defines how many ranges a byte range request may contain.
 
-By default only a single range of byte is allowed, which allows for retries and the vast majority
-of use cases. If you need multiple byte range support, you can increase that setting.
+The default value is `1`, which means a single range of bytes is accepted.
+This allows for retries and works for the vast majority of use cases.
 
-| Starting with version | The default value is |
-| --------------------- | -------------------- |
-| (original)            | `1`                  |
+[`ActiveStorage::Streaming`]: https://api.rubyonrails.org/classes/ActiveStorage/Streaming.html
+[HTTP Range Requests]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests
 
 ### Configuring Action Text
 
@@ -5004,170 +5007,212 @@ Accepts a string for the HTML tag used to wrap attachments. Defaults to `"action
 
 #### `config.action_text.sanitizer_vendor`
 
-Configures the HTML sanitizer used by Action Text by setting `ActionText::ContentHelper.sanitizer` to an instance of the class returned from the vendor's `.safe_list_sanitizer` method. The default value depends on the `config.load_defaults` target version:
+Configures the HTML sanitizer used by Action Text.
 
-| Starting with version | The default value is                 | Which parses markup as |
-|-----------------------|--------------------------------------|------------------------|
-| (original)            | `Rails::HTML4::Sanitizer`            | HTML4                  |
-| 7.1                   | `Rails::HTML5::Sanitizer` (see NOTE) | HTML5                  |
+The default value is `Rails::HTML5::Sanitizer`.
 
-NOTE: `Rails::HTML5::Sanitizer` is not supported on JRuby, so on JRuby platforms Rails will fall back to `Rails::HTML4::Sanitizer`.
+NOTE: Rails will back back to `Rails::HTML4::Sanitizer` when running on
+JRuby platforms, as `Rails::HTML5::Sanitizer` is not supported.
+
+### Miscellaneous Configuration Options
 
 #### `Regexp.timeout`
 
+Rails sets this value to `1.0` by default.
 
-See Ruby's documentation for [`Regexp.timeout=`](https://docs.ruby-lang.org/en/master/Regexp.html#method-c-timeout-3D).
+See Ruby's documentation for [
+`Regexp.timeout=`](https://docs.ruby-lang.org/en/master/Regexp.html#method-c-timeout-3D).
 
 ### Configuring a Database
 
-Just about every Rails application will interact with a database. You can connect to the database by setting an environment variable `ENV['DATABASE_URL']` or by using a configuration file called `config/database.yml`.
+The `config/database.yml` file specifies the connection information for all databases
+used in the Rails app.
 
-Using the `config/database.yml` file you can specify all the information needed to access your database:
+It is keyed by the three environments setup
+within Rails by default:
 
-```yaml
-development:
+* `development`: Used on your local machine while developing the application.
+* `test`: Used when running automated tests.
+* `production`: Used when your application is live on the internet.
+
+A `default` block containing options common to all environments
+may also be specified.
+
+```yml
+default: &default
   adapter: postgresql
-  database: blog_development
   pool: 5
+
+development:
+  <<: *default
+  database: myapp_development
+
+test:
+  <<: *default
+  database: myapp_test
+
+production:
+  <<: *default
+  database: myapp_production
 ```
 
-This will connect to the database named `blog_development` using the `postgresql` adapter. This same information can be stored in a URL and provided via an environment variable like this:
+In the development environment, this will connect to the database
+named `myapp_development` using the `postgresql` adapter.
+
+Alternatively, the same information can be formatted as a URL and provided
+via an environment variable named `DATABASE_URL`:
 
 ```ruby
-ENV["DATABASE_URL"] # => "postgresql://localhost/blog_development?pool=5"
+ENV["DATABASE_URL"] # => "postgresql://localhost/myapp_development?pool=5"
 ```
 
-The `config/database.yml` file contains sections for three different environments in which Rails can run by default:
-
-* The `development` environment is used on your development/local computer as you interact manually with the application.
-* The `test` environment is used when running automated tests.
-* The `production` environment is used when you deploy your application for the world to use.
-
-If you wish, you can manually specify a URL inside of your `config/database.yml`
+Or. the URL can also be specified in the `config/database.yml` file:
 
 ```yaml
 development:
   url: postgresql://localhost/blog_development?pool=5
 ```
 
-The `config/database.yml` file can contain ERB tags `<%= %>`. Anything in the tags will be evaluated as Ruby code. You can use this to pull out data from an environment variable or to perform calculations to generate the needed connection information.
+The [Connection Attribute Preference](#connection-attribute-preference)
+section below explains how Rails handles conflicting information in
+`config/database.yml` and `ENV["DATABASE_URL"]`.
 
-When using a `ENV['DATABASE_URL']` or a `url` key in your `config/database.yml`
-file, Rails allows mapping the protocol in the URL to a database adapter that
-can be configured from within the application. This allows the adapter to be
-configured without modifying the URL set in the deployment environment. See:
+The `config/database.yml` file can contain include Ruby code within
+ERB tags `<%= %>`. This technique can be used to read environment variables
+or calculate settings dynamically.
+
+```yml
+# ...
+
+production:
+  <<: *default
+  user: <%= ENV["DATABASE_USER"] %>
+  password: <%= ENV["DATABASE_PW"] %>
+  database: myapp_production
+```
+
+NOTE: The database adapter for any given URL scheme can be modified using
 [`config.active_record.protocol_adapters`](#config-active-record-protocol-adapters).
+When connecting to a database using a URL, this option allows you to change the
+database adapter without modifying the URL.
 
-TIP: You don't have to update the database configurations manually. If you look at the options of the application generator, you will see that one of the options is named `--database`. This option allows you to choose an adapter from a list of the most used relational databases. You can even run the generator repeatedly: `cd .. && rails new blog --database=mysql`. When you confirm the overwriting of the `config/database.yml` file, your application will be configured for MySQL instead of SQLite. Detailed examples of the common database connections are below.
+When an app connects to multiple databases, define each one under the environment
+key:
 
-### Connection Preference
+```yml
+# ...
 
-Since there are two ways to configure your connection (using `config/database.yml` or using an environment variable) it is important to understand how they can interact.
-
-If you have an empty `config/database.yml` file but your `ENV['DATABASE_URL']` is present, then Rails will connect to the database via your environment variable:
-
-```bash
-$ cat config/database.yml
-
-$ echo $DATABASE_URL
-postgresql://localhost/my_database
+production:
+  primary:
+    <<: *default
+    username: <%= ENV["PRIMARY_DATABASE_USER"] %>
+    password: <%= ENV["PRIMARY_DATABASE_PW"] %>
+    database: myapp_primary_database
+  primary_replica:
+    <<: *default
+    username: <%= ENV["REPLICA_DATABASE_USER"] %>
+    password: <%= ENV["REPLICA_DATABASE_PW"] %>
+    database: myapp_primary_database
+    replica: true
+  animals:
+    <<: *default
+    username: <%= ENV["ANIMALS_DATABASE_USER"] %>
+    password: <%= ENV["ANIMALS_DATABASE_PW"] %>
+    database: animals_database
+    migrations_paths: db/animals_migrate
 ```
 
-If you have a `config/database.yml` but no `ENV['DATABASE_URL']` then this file will be used to connect to your database:
+See the [Multiple Databases guide](active_record_multiple_databases.html)
+for further information.
 
-```bash
-$ cat config/database.yml
-development:
-  adapter: postgresql
-  database: my_database
-  host: localhost
+#### Connection Attribute Preference
 
-$ echo $DATABASE_URL
-```
+Database connections can be defined in the `config/database.yml` file, or
+the `DATABASE_URL` environment variable. This section explains how data from
+both these sources are married up.
 
-If you have both `config/database.yml` and `ENV['DATABASE_URL']` set then Rails will merge the configuration together. To better understand this we must see some examples.
+When only one of the above sources is present for a given environment, it will
+be used to connect to the database.
 
-When duplicate connection information is provided the environment variable will take precedence:
+When both sources are present simultaneously for a given environment, Rails
+will merge the information based on a number of rules (all below examples
+assume that Rails is running in the `development` environment):
 
-```bash
-$ cat config/database.yml
-development:
-  adapter: sqlite3
-  database: NOT_my_database
-  host: localhost
+1.  The environment variable takes precendence when both sources contain
+    conflicting information.
 
-$ echo $DATABASE_URL
-postgresql://localhost/my_database
+    ```yml
+    # config/database.yml
 
-$ bin/rails runner 'puts ActiveRecord::Base.configurations.inspect'
-#<ActiveRecord::DatabaseConfigurations:0x00007fc8eab02880 @configurations=[
-  #<ActiveRecord::DatabaseConfigurations::UrlConfig:0x00007fc8eab020b0
-    @env_name="development", @spec_name="primary",
-    @config={"adapter"=>"postgresql", "database"=>"my_database", "host"=>"localhost"}
-    @url="postgresql://localhost/my_database">
-  ]
-```
+    development:
+      adapter: sqlite3
+      timeout: 5000
+      database: storage/development.sqlite3
+    ```
 
-Here the adapter, host, and database match the information in `ENV['DATABASE_URL']`.
+    ```bash
+    export DATABASE_URL="sqlite3:storage/app.sqlite3"
+    bin/rails runner 'puts ActiveRecord::Base.connection_db_config.configuration_hash'
+    # => {adapter: "sqlite3", timeout: 5000, database: "storage/app.sqlite3"}
+    ```
 
-If non-duplicate information is provided you will get all unique values, environment variable still takes precedence in cases of any conflicts.
+2.  Non-conflicting values will be merged.
 
-```bash
-$ cat config/database.yml
-development:
-  adapter: sqlite3
-  pool: 5
+    ```yml
+    # config/database.yml
 
-$ echo $DATABASE_URL
-postgresql://localhost/my_database
+    development:
+      adapter: sqlite3
+      timeout: 5000
+    ```
 
-$ bin/rails runner 'puts ActiveRecord::Base.configurations.inspect'
-#<ActiveRecord::DatabaseConfigurations:0x00007fc8eab02880 @configurations=[
-  #<ActiveRecord::DatabaseConfigurations::UrlConfig:0x00007fc8eab020b0
-    @env_name="development", @spec_name="primary",
-    @config={"adapter"=>"postgresql", "database"=>"my_database", "host"=>"localhost", "pool"=>5}
-    @url="postgresql://localhost/my_database">
-  ]
-```
+    ```bash
+    export DATABASE_URL="sqlite3:storage/development.sqlite3?pool=5"
+    bin/rails runner 'puts ActiveRecord::Base.connection_db_config.configuration_hash'
+    # => {adapter: "sqlite3", timeout: 5000, database: "storage/development.sqlite3", pool: "5"}
+    ```
 
-Since pool is not in the `ENV['DATABASE_URL']` provided connection information its information is merged in. Since `adapter` is duplicate, the `ENV['DATABASE_URL']` connection information wins.
+3.  When a `url` key is specified in the `config/database.yml`, it will completely
+    override the `DATABASE_URL` environment variable:
 
-The only way to explicitly not use the connection information in `ENV['DATABASE_URL']` is to specify an explicit URL connection using the `"url"` sub key:
+    ```yml
+    # config/database.yml
 
-```bash
-$ cat config/database.yml
-development:
-  url: sqlite3:NOT_my_database
+    development:
+      url: "sqlite3:storage/development.sqlite3"
+    ```
 
-$ echo $DATABASE_URL
-postgresql://localhost/my_database
+    ```bash
+    export DATABASE_URL="sqlite3:storage/app.sqlite3?pool=5"
+    bin/rails runner 'puts ActiveRecord::Base.connection_db_config.configuration_hash'
+    # => {adapter: "sqlite3", database: "storage/development.sqlite3"}
+    ```
 
-$ bin/rails runner 'puts ActiveRecord::Base.configurations.inspect'
-#<ActiveRecord::DatabaseConfigurations:0x00007fc8eab02880 @configurations=[
-  #<ActiveRecord::DatabaseConfigurations::UrlConfig:0x00007fc8eab020b0
-    @env_name="development", @spec_name="primary",
-    @config={"adapter"=>"sqlite3", "database"=>"NOT_my_database"}
-    @url="sqlite3:NOT_my_database">
-  ]
-```
+In production, using the `DATABASE_URL` environment variable is recommended,
+as well as showing its usage explicitly in `config.database.yml`:
 
-Here the connection information in `ENV['DATABASE_URL']` is ignored, note the different adapter and database name.
+```yml
+# config/database.yml
 
-Since it is possible to embed ERB in your `config/database.yml` it is best practice to explicitly show you are using the `ENV['DATABASE_URL']` to connect to your database. This is especially useful in production since you should not commit secrets like your database password into your source control (such as Git).
+# ...
 
-```bash
-$ cat config/database.yml
 production:
   url: <%= ENV['DATABASE_URL'] %>
 ```
 
-Now the behavior is clear, that we are only using the connection information in `ENV['DATABASE_URL']`.
+#### Configuring a SQLite3 Database
 
-#### Configuring an SQLite3 Database
+Rails connects to a SQLite3 database using the
+[`sqlite3`](https://github.com/sparklemotion/sqlite3-ruby) gem.
 
-Rails comes with built-in support for [SQLite3](https://www.sqlite.org), which is a lightweight serverless database application. While Rails better configures SQLite for production workloads, a busy production environment may overload SQLite. Rails defaults to using an SQLite database when creating a new project because it is a zero configuration database that just works, but you can always change it later.
+The built-in adapter configures a production-ready connection. See
+[`ActiveRecord::ConnectionAdapters::SQLite3Adapter`](https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/SQLite3Adapter.html) for details.
 
-Here's the section of the default configuration file (`config/database.yml`) with connection information for the development environment:
+This is the default adapter which is configured when creating a new Rails app.
+Another adapter may be specified using the
+[`--database` option](command_line.html#configure-a-different-database).
+
+Here's an example SQLite database configuration:
 
 ```yaml
 development:
@@ -5177,61 +5222,67 @@ development:
   timeout: 5000
 ```
 
-[SQLite extensions](https://sqlite.org/loadext.html) are supported when using `sqlite3` gem v2.4.0 or later by configuring `extensions`:
+[SQLite extensions](https://sqlite.org/loadext.html) are supported when using
+`sqlite3` gem v2.4.0 or later:
 
-``` yaml
+``` yaml#4-6
 development:
   adapter: sqlite3
+  database: storage/development.sqlite3
   extensions:
     - SQLean::UUID                     # module name responding to `.to_path`
     - .sqlpkg/nalgeon/crypto/crypto.so # or a filesystem path
     - <%= AppExtensions.location %>    # or ruby code returning a path
 ```
 
-Many useful features can be added to SQLite through extensions. You may wish to browse the [SQLite extension hub](https://sqlpkg.org/) or use gems like [`sqlpkg-ruby`](https://github.com/fractaledmind/sqlpkg-ruby) and [`sqlean-ruby`](https://github.com/flavorjones/sqlean-ruby) that simplify extension management.
-
-Other configuration options are described in the [SQLite3Adapter documentation]( https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/SQLite3Adapter.html).
-
 #### Configuring a MySQL or MariaDB Database
 
-If you choose to use MySQL or MariaDB instead of the shipped SQLite3 database, your `config/database.yml` will look a little different. Here's the development section:
+Rails connects to a MySQL database using the
+[`mysql2`](https://github.com/brianmario/mysql2) gem.
+
+Ensure this gem is installing in your Gemfile, and then specify `mysql2` as
+the adapter in your database configuration. Here's an example:
 
 ```yaml
 development:
   adapter: mysql2
-  encoding: utf8mb4
-  database: blog_development
+  database: myapp_development
   pool: 5
-  username: root
-  password:
   socket: /tmp/mysql.sock
 ```
 
-If your development database has a root user with an empty password, this configuration should work for you. Otherwise, change the username and password in the `development` section as appropriate.
+Ensure you specify a `username` and `password` if your database requires one.
 
-NOTE: If your MySQL version is 5.5 or 5.6 and want to use the `utf8mb4` character set by default, please configure your MySQL server to support the longer key prefix by enabling `innodb_large_prefix` system variable.
+Advisory locks are enabled by default on MySQL and are used to make database
+migrations concurrency safe. This can be disabled using:
 
-Advisory Locks are enabled by default on MySQL and are used to make database migrations concurrent safe. You can disable advisory locks by setting `advisory_locks` to `false`:
-
-```yaml
+```yaml#3
 production:
   adapter: mysql2
   advisory_locks: false
+  # ...
 ```
 
 #### Configuring a PostgreSQL Database
 
-If you choose to use PostgreSQL, your `config/database.yml` will be customized to use PostgreSQL databases:
+Rails connects to a MySQL database using the
+[`pg`](https://github.com/ged/ruby-pg) gem.
+
+Ensure this gem is installing in your Gemfile, and then specify `postgresql` as
+the adapter in your database configuration. Here's an example:
 
 ```yaml
 development:
   adapter: postgresql
-  encoding: unicode
-  database: blog_development
+  database: myapp_development
   pool: 5
 ```
 
-By default Active Record uses a database feature called advisory locks. You might need to disable this feature if you're using an external connection pooler like PgBouncer:
+Ensure you specify a `username` and `password` if your database requires
+it.
+
+Advisory locks are enabled by default on PostgreSQL and are used to make database
+migrations concurrency safe. This can be disabled using:
 
 ```yaml
 production:
@@ -5239,134 +5290,129 @@ production:
   advisory_locks: false
 ```
 
-If enabled, Active Record will create up to `1000` prepared statements per database connection by default. To modify this behavior you can set `statement_limit` to a different value:
+Active Record automatically maintains a cache of prepared statements when using
+PostgreSQL. By default, the limit is set to `1000` statements. Change it using:
 
-```yaml
+```yaml#3
 production:
   adapter: postgresql
   statement_limit: 200
 ```
 
-The more prepared statements in use: the more memory your database will require. If your PostgreSQL database is hitting memory limits, try lowering `statement_limit` or disabling prepared statements.
+Or disable prepared statements completely:
 
-#### Configuring an SQLite3 Database for JRuby Platform
-
-If you choose to use SQLite3 and are using JRuby, your `config/database.yml` will look a little different. Here's the development section:
-
-```yaml
-development:
-  adapter: jdbcsqlite3
-  database: storage/development.sqlite3
+```yaml#3
+production:
+  adapter: postgresql
+  prepared_statements: false
 ```
 
-#### Configuring a MySQL or MariaDB Database for JRuby Platform
+Prepared statements can speed up query execution and planning, but will
+use more memory on the database server.
 
-If you choose to use MySQL or MariaDB and are using JRuby, your `config/database.yml` will look a little different. Here's the development section:
+#### Configuring the Database on JRuby
 
-```yaml
-development:
-  adapter: jdbcmysql
-  database: blog_development
-  username: root
-  password:
-```
-
-#### Configuring a PostgreSQL Database for JRuby Platform
-
-If you choose to use PostgreSQL and are using JRuby, your `config/database.yml` will look a little different. Here's the development section:
-
-```yaml
-development:
-  adapter: jdbcpostgresql
-  encoding: unicode
-  database: blog_development
-  username: blog
-  password:
-```
-
-Change the username and password in the `development` section as appropriate.
+Connecting to the database on the JRuby platform requires the
+[`activerecord-jdbc-adapter`](https://github.com/jruby/activerecord-jdbc-adapter) gem.
+The Readme contains the details for each supported database.
 
 #### Configuring Metadata Storage
 
-By default Rails will store information about your Rails environment and schema
-in an internal table named `ar_internal_metadata`.
+Rails stores information about the environment and schema
+in a table named `ar_internal_metadata`.
 
-To turn this off per connection, set `use_metadata_table` in your database
-configuration. This is useful when working with a shared database and/or
-database user that cannot create tables.
+This can be disabled for a specific connection by setting
+`use_metadata_table`:
 
-```yaml
-development:
+```yaml#3
+production:
   adapter: postgresql
   use_metadata_table: false
 ```
 
+This may be useful when connecting to a shared database where the Rails
+app cannot create new tables.
+
 #### Configuring Retry Behavior
 
-By default, Rails will automatically reconnect to the database server and retry certain queries
-if something goes wrong. Only safely retryable (idempotent) queries will be retried. The number
-of retries can be specified in your the database configuration via `connection_retries`, or disabled
-by setting the value to 0. The default number of retries is 1.
+Rails will automatically reconnect to the database server and retry certain queries
+if something goes wrong.
 
-```yaml
-development:
+The number of retries is set to `1` by default, but can be customized:
+
+```yaml#3
+production:
   adapter: mysql2
-  connection_retries: 3
+  connection_retries: 3 # Set to `0` to disable retries
 ```
 
-The database config also allows a `retry_deadline` to be configured. If a `retry_deadline` is configured,
-an otherwise-retryable query will _not_ be retried if the specified time has elapsed while the query was
-first tried. For example, a `retry_deadline` of 5 seconds means that if 5 seconds have passed since a query
-was first attempted, we won't retry the query, even if it is idempotent and there are `connection_retries` left.
+Only idempotent queries — which are safe to retry — will be retried.
 
-This value defaults to nil, meaning that all retryable queries are retried regardless of time elapsed.
-The value for this config should be specified in seconds.
+A `retry_deadline` may also be specified. This is a time period in seconds
+after which the query will not be retried.
 
-```yaml
-development:
+```yaml#3
+production:
   adapter: mysql2
   retry_deadline: 5 # Stop retrying queries after 5 seconds
 ```
 
+In the above example, a query will not be retried after more than 5 seconds
+since the first attempt, even if the maximum retry count hasn't been hit.
+
+This value is `nil` by default, which means that there is no time limit
+for retries.
+
 #### Configuring Query Cache
 
-By default, Rails automatically caches the result sets returned by queries. If Rails encounters the same query
-again for that request or job, it will use the cached result set as opposed to running the query against
-the database again.
+Rails maintains a cache for result sets returned by queries. When Rails
+encounters the same query again for a given request or job, the cached result
+will be used instead of hitting the database again.
 
-The query cache is stored in memory, and to avoid using too much memory, it automatically evicts the least recently
-used queries when reaching a threshold. By default the threshold is `100`, but can be configured in the `database.yml`.
+The query cache is stored in memory where the least recently used query is
+evicted when the cache ceiling is hit. The default cache size is `100`, but
+can be customized in the `database.yml`.
 
-```yaml
-development:
+```yaml#3
+production:
   adapter: mysql2
   query_cache: 200
 ```
 
-To entirely disable query caching, it can be set to `false`
+Disable query caching by setting this option to `false`:
 
-```yaml
-development:
+```yaml#3
+production:
   adapter: mysql2
   query_cache: false
 ```
 
 ### Creating Rails Environments
 
-By default Rails ships with three environments: "development", "test", and "production". While these are sufficient for most use cases, there are circumstances when you want more environments.
+By default Rails ships with three environments: `development`, `test`, and
+`production`. Creating additional environments is not recommended. Using environment
+variables to modify app configuration is the preferred approach.
 
-Imagine you have a server which mirrors the production environment but is only used for testing. Such a server is commonly called a "staging server". To define an environment called "staging" for this server, just create a file called `config/environments/staging.rb`. Since this is a production-like environment, you could copy the contents of `config/environments/production.rb` as a starting point and make the necessary changes from there. It's also possible to require and extend other environment configurations like this:
+However, it is possible to create custom environments if required. For example, these
+are the steps required to create a `staging` environment.
 
-```ruby
-# config/environments/staging.rb
-require_relative "production"
+1. Create a configuration file for the environment (`config/environments/staging.rb`)
+2. Define the environment specific configuration, using `require_relative` to load
+  configurations from other environment files if required.
 
-Rails.application.configure do
-  # Staging overrides
-end
+The environment can now be used:
+
+```bash
+$ bin/rails server -e staging
 ```
 
-That environment is no different than the default ones, start a server with `bin/rails server -e staging`, a console with `bin/rails console -e staging`, `Rails.env.staging?` works, etc.
+TODO test above
+
+NOTE: In a practical setting, you can run a staging server by using environment
+variables to configure databases and other external services, while using the
+`production` Rails environment. A custom environment causes additional complexity
+in environment-specific logic, and when defining bundler groups in your Gemfile.
+As such it is not recommended.
 
 ### Deploy to a Subdirectory (relative URL root)
 
