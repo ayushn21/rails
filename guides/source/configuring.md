@@ -4715,7 +4715,7 @@ The default value is `true`.
 
 Configures the URL for the Action Cable server, specified as a string.
 
-Use this option when running stand-alone Action Cable servers.
+Use this option when running standalone Action Cable servers.
 
 #### `config.action_cable.mount_path`
 
@@ -4737,6 +4737,21 @@ It has no effect when Sprockets is not used.
 
 The default value is `true`.
 
+#### `config.action_cable.connection_class`
+
+Specifies a custom class to use for each Action Cable connection. This
+value must be a proc which returns the class.
+
+The default value is `nil`, which means `ApplicationCable::Connection`
+is used.
+
+#### `config.action_cable.worker_pool_size`
+
+Sets the size of Action Cable's thread pool which is used to
+process WebSocket messages.
+
+The default value is unset, meaning it falls back to `4`.
+
 #### `config.action_cable.allow_same_origin_as_host`
 
 A boolean which determines whether an origin matching the
@@ -4755,6 +4770,53 @@ of those types.
 
 The default value in `development` is `/https?:\/\/localhost:\d+/`. It is
 unset in all other environments.
+
+#### `config.action_cable.disable_request_forgery_protection`
+
+When set to `true`, request forgery protection is disabled for Action Cable
+requests, meaning requests from all origins will be accepted.
+
+The default value is `false`.
+
+#### `config.action_cable.logger`
+
+Registers a logger for Action Cable, conforming to the interface of
+`Log4r` or the default Ruby `Logger` class.
+
+Defaults to [`config.logger`](#config-logger).
+
+Set this to `nil` to disable logging for Action Cable.
+
+#### `config.action_cable.log_tags`
+
+Similar to [`config.log_tags`](#config-log-tags), but specifically
+for Action Cable.
+
+It is unset by default.
+
+#### `config.action_cable.filter_parameters`
+
+Similar to [`config.filter_parameters`](#config-filter-parameters), but
+specifically for Action Cable.
+
+The default value is unset — meaning `config.filter_parameters` will
+be used as a fall back.
+
+#### `config.action_cable.health_check_path`
+
+The path on the Action Cable server used for health-check requests. This
+is `nil` by default which disables health-checks for Action Cable server.
+
+The health-check endpoint for your main Rails application is unaffected.
+This option may be useful when running standalone Action Cable servers.
+
+#### `config.action_cable.health_check_application`
+
+The Rack application used by the Action Cable server to respond
+to health-check requests. The default is the `show` action of the
+[`Rails::HealthController`][].
+
+[`Rails::HealthController`]: https://api.rubyonrails.org/classes/Rails/HealthController.html
 
 ### Configuring Active Storage
 
