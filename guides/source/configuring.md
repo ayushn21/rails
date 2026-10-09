@@ -502,8 +502,9 @@ The complete list of default values for all Rails versions can be found
 in the [Default Configuration Values](default_configuration_values.html)
 guide.
 
-**All default values listed in this guide are current as per the `main`
-branch with `config.load_defaults` set to the latest version.**
+**The defaults for all options listed in this guide use the value
+loaded when the `config.load_defaults` option is set to the current version of
+Rails.**
 
 ### General Configuration Options
 
